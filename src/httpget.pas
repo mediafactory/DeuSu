@@ -1,8 +1,8 @@
 unit httpget;
 
 (*
-    OpenAcoon - An OpenSource Internet-Search-Engine
-    Copyright (C) 1999-2014 Acoon GmbH
+    DeuSu - An OpenSource Internet-Search-Engine
+    Copyright (C) 1999-2015 Michael Schoebel & Acoon GmbH
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License version 2 as
