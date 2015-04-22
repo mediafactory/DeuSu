@@ -1,4 +1,4 @@
-### OpenAcoon
+### DeuSu
 
 This is a web search-engine that can easily hold a few hundred million web-pages
 in its search-index. If you want to see what it can do see

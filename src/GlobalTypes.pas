@@ -2,7 +2,7 @@ unit GlobalTypes;
 
 (*
     OpenAcoon - An OpenSource Internet-Search-Engine
-    Copyright (C) 1999-2015 Acoon GmbH & Michael Schoebel
+    Copyright (C) 1999-2015 Michael Schoebel & Acoon GmbH
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License version 2 as
@@ -43,7 +43,7 @@ const
     cDate = '22-Apr-2015';
     cVersion = cShortVersion + ' '+cIs64Bit+' '+cDate;
 
-    cCopyright = '(c) 1999-2014 Acoon GmbH & Michael Schoebel';
+    cCopyright = '(c) 1999-2015 Michael Schoebel & Acoon GmbH';
     cVersionCopy = cVersion + '  ' + cCopyright;
     cGPLNotice = '';
     (*  'This program is licensed under GPL version 2 (see LICENSE.TXT)' + cCRLF +
