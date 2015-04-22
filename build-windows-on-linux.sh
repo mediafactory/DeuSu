@@ -1,48 +1,43 @@
 #!/bin/bash
-echo "Starting Cross-Compile for Windows on Linux of OpenAcoon..."
-echo "------------------------------------"
-rm src/*.o
-rm src/*.ppu
-rm src/cgi/*.o
-rm src/cgi/*.ppu
+echo "Starting Cross-Compile for Windows on Linux of DeuSu..."
+echo "-------------------------------------------------------"
 mkdir bin
-rm bin/*
+mkdir bin/units
+rm bin/units/*.o
+rm bin/units/*.ppu
+rm bin/units/*.rst
 set -e
 
 compiler="fpc -Mdelphi -Twin64 -O3 -Xs -XX -vew -vq"
-compiler=$compiler" -Fudep/indy10/Lib/*"
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+compiler=$compiler" -Fusrc/dep/indy10/Lib/*"
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #
-# You will probably need to change the path in the following line to match your setup
+# You will probably need to change the path in the following
+# line to match your setup!
 #
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 compiler=$compiler" -Fu/usr/local/lib/fpc/2.6.4/units/x86_64-win64/*"
-compiler=$compiler" -FE."
+compiler=$compiler" -FEbin -FUbin/units"
 
 
 function compile {
     $compiler $1.dpr
-    if [ -e "$1.exe" ]
-    then
-        mv $1.exe ../bin
-    fi
     echo -e '\n'
 }
 
 
-cd src
+compile src/RobotNew
+compile src/searchservernew
+compile src/ImportUrls
+compile src/CleanUrlsTxt
+compile src/PrepareRobot
+compile src/ImportData
+compile src/Sleep
+compile src/Parser
+compile src/GenDb
+compile src/cgi/query
 
-compile RobotNew
-compile searchservernew
-compile ImportUrls
-compile CleanUrlsTxt
-compile PrepareRobot
-compile ImportData
-compile Sleep
-compile Parser
-compile GenDb
-compile cgi/query
-mv query.exe ../bin
+# The following two only compile with Delphi. Needs fixing.
 #compile Robot
 #compile SearchServer
 

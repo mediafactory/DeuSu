@@ -1,6 +1,6 @@
 #!/bin/bash
-echo "Starting Linux build of OpenAcoon..."
-echo "------------------------------------"
+echo "Starting Linux build of DeuSu..."
+echo "--------------------------------"
 mkdir bin
 mkdir bin/units
 rm bin/units/*.o
@@ -10,11 +10,12 @@ set -e
 
 compiler="fpc -Mdelphi -Tlinux -O3 -vew -vq"
 compiler=$compiler" -Fusrc/dep/indy10/Lib/*"
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #
-# You will probably need to change the path in the following line to match your setup
+# You will probably need to change the path in the following
+# line to match your setup!
 #
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 compiler=$compiler" -Fu/usr/lib64/fpc/2.6.4/units/x86_64-linux/*"
 compiler=$compiler" -FEbin -FUbin/units"
 
@@ -24,8 +25,6 @@ function compile {
     echo -e '\n'
 }
 
-
-#cd src
 
 compile src/RobotNew
 compile src/searchservernew
