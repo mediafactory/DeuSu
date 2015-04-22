@@ -21,11 +21,11 @@ several subdirectories within your install directory that will hold all the data
 <p>This will use a list of one million sites as a starting-point for your crawl. If one million URLs
 sounds like a lot to you... you ain't seen nothing yet. :)</p>
 
-<p>Now these URLs need to be imported into the URL-database. Run "openacoon.bat". This batch-file will also later be used
+<p>Now these URLs need to be imported into the URL-database. Run "deusu.sh/.bat". This batch-file will also later be used
 when you are in the middle of a crawl to process all the data. Right now it will only import the starting URLs into the
 database. The batch-file will run continuously, so you need to abort it at the right point. It will pause for 5 seconds
 every pass. You will see this point when it counts down the seconds... 5...4...3...2...1... Sometime during that simply
-press Ctrl-C and abort the batch-file. You should NEVER abort openacoon.bat at any other point. It may damage the
+press Ctrl-C and abort the batch-file. You should NEVER abort deusu.sh/.bat at any other point. It may damage the
 databases. That's why there is a visible countdown, so that you know when you can safely stop the batch-file.</p>
 
 <p>You should now have about 1 million URLs in the database. So now you need to give these to the actual robot. That is
@@ -59,7 +59,7 @@ use more than 1000 connections. You will have to experiment with this. Note that
 you are in the crawl. At the beginning of a crawl the crawler is very busy doing all the DNS lookups, so you may need
 to use a lower connection-limit then, compared to later in the crawl.</p>
 
-<p>Anyway, while the robot starts up (or very shortly thereafter) you should start "openacoon.bat" again, so that it can
+<p>Anyway, while the robot starts up (or very shortly thereafter) you should start "deusu.sh/.bat" again, so that it can
 handle all the data-processing.</p>
 
 <p>Note: I'm usually running this software on a server with a quad-core 3.2GHz CPU, 32gb RAM, and a 1gbit/s
@@ -67,10 +67,10 @@ internet-connection. The limit for this machine is a crawl at about 1000 pages/s
 
 <p>When you want to end the robot, set the connection-limit to 0 and wait a bit for it to finish all the work. Then you
 can quit the robot. You should then wait a few seconds more for parse.bat, so that it can process all the incoming data.
-And yet wait another bit for openacoon.bat to finish processing the data. Quit openacoon.bat at some point when you see
-it counting down from 5 to 0. Remember to NEVER abort openacoon.bat at some other point.</p>
+And yet wait another bit for deusu.sh/.bat to finish processing the data. Quit deusu.sh/.bat at some point when you see
+it counting down from 5 to 0. Remember to NEVER abort deusu.sh/.bat at some other point.</p>
 
-<p>You can now begin another PrepareRobot / Robot / OpenAcoon.bat loop, or you can generate your first search-index. Here's
+<p>You can now begin another PrepareRobot / Robot / deusu.sh/.bat loop, or you can generate your first search-index. Here's
 how to build an index: Simply start Gendb.exe from the command-prompt. With a very small amount of WWW-pages this will
 only take about a minute or two. With larger amounts of data you should expect it to be on the order of one hour per 40 million pages.</p>
 

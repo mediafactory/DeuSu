@@ -1,7 +1,7 @@
 unit GlobalTypes;
 
 (*
-    OpenAcoon - An OpenSource Internet-Search-Engine
+    DeuSu - An OpenSource Internet-Search-Engine
     Copyright (C) 1999-2015 Michael Schoebel & Acoon GmbH
 
     This program is free software; you can redistribute it and/or modify

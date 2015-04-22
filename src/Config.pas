@@ -1,8 +1,8 @@
 unit Config;
 
 (*
-    OpenAcoon - An OpenSource Internet-Search-Engine
-    Copyright (C) 1999-2014 Acoon GmbH
+    DeuSu - An OpenSource Internet-Search-Engine
+    Copyright (C) 1999-2015 Michael Schoebel & Acoon GmbH
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License version 2 as
@@ -35,8 +35,8 @@ const
     // cConfigName is the first part of the configuration-file's filename.
     // Actual filenames are cConfigName+'.config.default' and
     // cConfigName+'.config'. If you are using this unit in any software
-    // different from OpenAcoon, then you need to change this constant.
-    cConfigName = 'openacoon';
+    // different from DeuSu, then you need to change this constant.
+    cConfigName = 'deusu';
 
 var
     // Settings and Values are used to store the setting-names and

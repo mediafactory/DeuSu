@@ -1,8 +1,8 @@
 unit RobotsTxt;
 
 (*
-    OpenAcoon - An OpenSource Internet-Search-Engine
-    Copyright (C) 1999-2014 Acoon GmbH
+    DeuSu - An OpenSource Internet-Search-Engine
+    Copyright (C) 1999-2015 Michael Schoebel & Acoon GmbH
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License version 2 as
@@ -188,7 +188,7 @@ begin
                 begin
                     Delete(s, 1, 11);
                     s := Trim(s);
-                    IsValidUA := (Pos('acoon', s) > 0) or (s = '*');
+                    IsValidUA := (Pos('deusu', s) > 0) or (s = '*');
                 end
                 else if copy(s, 1, 9) = 'disallow:' then
                 begin

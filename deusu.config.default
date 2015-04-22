@@ -1,4 +1,4 @@
-; openacoon.config.default
+; deusu.config.default
 ;
 ; All lines starting with ";" are always ignored by the software.
 ; From all other lines, only those containing an equal-sign ("=")
@@ -16,20 +16,20 @@
 ; part of the value! Everything right of the equal-sign is
 ; considered to be the value of the setting.
 ;
-; openacoon.config.default ist processed first, followed by
-; openacoon.config. Therefore any settings in openacoon.config will
-; overwrite the settings made in openacoon.config.default.
+; deusu.config.default ist processed first, followed by
+; deusu.config. Therefore any settings in deusu.config will
+; overwrite the settings made in deuse.config.default.
 
 
 
 ; This sets the user-agent that the robot reports to the server.
 ; The robots.txt handling in RobotsTxt.pas will check the server's
 ; robots.txt for disallows for this user-agent and for any
-; user-agent with "acoon" (case-independent) in its name.
+; user-agent with "deusu" (case-independent) in its name.
 ; Settings for user-agent "*" will of course also be checked in
 ; robots.txt
 
-robot.useragent=Mozilla/5.0 (compatible; OpenAcoon/5.0.0)
+robot.useragent=Mozilla/5.0 (compatible; DeuSu/5.0.0)
 
 
 
@@ -90,7 +90,7 @@ ImportData.UseUrlPreload=true
 
 ; Urls to be added to the URL-database.
 ; !!! BEWARE !!! If you change this setting you will also need to
-; change the CleanUrlsTxt-command in OpenAcoon.Bat accordingly!
+; change the CleanUrlsTxt-command in deusu.sh/.bat accordingly!
 
 file-system.Urls=data\txt\urls.txt
 
@@ -133,16 +133,16 @@ file-system.KeyDb=data\db2.key
 
 
 
-; The following settings are primarily by the Robot/Parser combo.
+; The following settings are primarily for the Robot/Parser combo.
 ; The Robot saves files in InPath, the Parser reads these and
-; puts its output in ParsedPath. OpenAcoon.bat move these to
+; puts its output in ParsedPath, deusu.sh/.bat moves these to
 ; ImportPath from where ImportData reads them.
 ; SpeedTrap is used by the Parser to indicate to the Robot that
 ; it can't process the files at the current speed and that the
 ; Robot should slow down.
 ; !!! BEWARE !!! If you change the ParsedPath and/or ImportPath
 ; settings, then you also need to change the Move-command in
-; OpenAcoon.bat accordingly!
+; deusu.sh/.bat accordingly!
 
 file-system.InPath=data\crawler\in\
 file-system.ParsedPath=data\crawler\parsed\
