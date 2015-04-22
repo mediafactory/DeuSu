@@ -9,7 +9,7 @@ The search-index on that site currently holds about 327 million WWW-pages.
 On average a query takes about 0.6 seconds. The transfer-speed from SSD into
 RAM is the limiting-factor for query-time. Even 600mb/s can be slow sometimes. :)
 
-The software was originalle written in Delphi (=Pascal). The latest Delphi
+The software was originally written in Delphi (=Pascal). The latest Delphi
 version I have is XE2, and I don't know if it will compile and run in newer
 versions of Delphi. Please see the notes below about compiling with FreePascal
 for Linux and Windows.
