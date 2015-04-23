@@ -47,15 +47,16 @@ procedure InitUrlFind;
 var
     i: integer;
 begin
-    UseUrlPreload := LowerCase(ConfigReadString('ImportData.UseUrlPreload')) = 'true';
+  UseUrlPreload :=
+    LowerCase(Config.ReadString('ImportData.UseUrlPreload')) = 'true';
 
-    PreloadCount := 0;
-    for i := 0 to cDbCount - 1 do
-    begin
-        UrlDb[i] := tPreloadedFile.Create;
-        UrlDb[i].Assign(cUrlDb + IntToStr(i));
-        UrlDb[i].OpenReadWrite;
-    end;
+  PreloadCount := 0;
+  for i := 0 to cDbCount - 1 do
+  begin
+    UrlDb[i] := tPreloadedFile.Create;
+    UrlDb[i].Assign(cUrlDb + IntToStr(i));
+    UrlDb[i].OpenReadWrite;
+  end;
 end;
 
 

@@ -82,13 +82,13 @@ begin
     FillChar(LastFailed, SizeOf(LastFailed), 0);
 
     HTTPClientDefaultMaxSize :=
-    ConfigReadIntegerDefault('index.max-page-size', 200 * 1024);
+    Config.ReadIntegerDefault('index.max-page-size', 200 * 1024);
     if HTTPClientDefaultMaxSize < 10240 then
         HTTPClientDefaultMaxSize := 10240;
     if HTTPClientDefaultMaxSize > 16 * 1024 * 1024 then
         HTTPClientDefaultMaxSize := 16 * 1024 * 1024;
 
-    s := ConfigReadString('robot.useragent');
+    s := Config.ReadString('robot.useragent');
     if s <> '' then HTTPClientDefaultUserAgent := s;
 
     StartTi := GetTickCount;

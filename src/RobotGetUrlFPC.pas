@@ -595,7 +595,7 @@ end;
 
 
 begin
-    UserAgent := ConfigReadString('robot.useragent');
+    UserAgent := Config.ReadString('robot.useragent');
     CritSec := tCriticalSection.Create;
     OutputOpen := false;
     OutputNumber := 0;

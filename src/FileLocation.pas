@@ -54,84 +54,84 @@ begin
     // slash and backslash for Windows/Linux/Mac compatibility should be
     // added.
 
-    cUrls:=ConfigReadString('file-system.Urls');
+    cUrls:=Config.ReadString('file-system.Urls');
     if cUrls='' then cUrls:='data\txt\urls.txt';
     CorrectPathSeparators(cUrls);
 
-    cAddUrl:=ConfigReadString('file-system.AddUrl');
+    cAddUrl:=Config.ReadString('file-system.AddUrl');
     if cAddUrl='' then cAddUrl:='data\txt\addurl.txt';
     CorrectPathSeparators(cAddUrl);
 
-    cUrlList:=ConfigReadString('file-system.UrlList');
+    cUrlList:=Config.ReadString('file-system.UrlList');
     if cUrlList='' then cUrlList:='data\txt\robot.url';
     CorrectPathSeparators(cUrlList);
 
-    cIgnorePages:=ConfigReadString('file-system.IgnorePages');
+    cIgnorePages:=Config.ReadString('file-system.IgnorePages');
     if cIgnorePages='' then cIgnorePages:='data\txt\ignorepages.txt';
     CorrectPathSeparators(cIgnorePages);
 
-    cIgnoreHosts:=ConfigReadString('file-system.IgnoreHosts');
+    cIgnoreHosts:=Config.ReadString('file-system.IgnoreHosts');
     if cIgnoreHosts='' then cIgnoreHosts:='data\txt\ignorehosts.txt';
     CorrectPathSeparators(cIgnoreHosts);
 
 
 
-    cUrlDb:=ConfigReadString('file-system.UrlDb');
+    cUrlDb:=Config.ReadString('file-system.UrlDb');
     if cUrlDb='' then cUrlDb:='data\db2.url';
     CorrectPathSeparators(cUrlDb);
 
-    cInfDb:=ConfigReadString('file-system.InfDb');
+    cInfDb:=Config.ReadString('file-system.InfDb');
     if cInfDb='' then cInfDb:='data\db2.inf';
     CorrectPathSeparators(cInfDb);
 
-    cKeyDb:=ConfigReadString('file-system.KeyDb');
+    cKeyDb:=Config.ReadString('file-system.KeyDb');
     if cKeyDb='' then cKeyDb:='data\db2.key';
     CorrectPathSeparators(cKeyDb);
 
 
 
 
-    cInPath:=ConfigReadString('file-system.InPath');
+    cInPath:=Config.ReadString('file-system.InPath');
     if cInPath='' then cInPath:='data\crawler\in\';
     CorrectPathSeparators(cInPath);
 
-    cParsedPath:=ConfigReadString('file-system.ParsedPath');
+    cParsedPath:=Config.ReadString('file-system.ParsedPath');
     if cParsedPath='' then cParsedPath:='data\crawler\parsed\';
     CorrectPathSeparators(cParsedPath);
 
-    cImportPath:=ConfigReadString('file-system.ImportPath');
+    cImportPath:=Config.ReadString('file-system.ImportPath');
     if cImportPath='' then cImportPath:='data\crawler\import\';
     CorrectPathSeparators(cImportPath);
 
-    cSpeedTrap:=ConfigReadString('file-system.SpeedTrap');
+    cSpeedTrap:=Config.ReadString('file-system.SpeedTrap');
     if cSpeedTrap='' then cSpeedTrap:='data\crawler\speedtrap.dat';
     CorrectPathSeparators(cSpeedTrap);
 
 
 
-    cSDataPath:=ConfigReadString('file-system.SDataPath');
+    cSDataPath:=Config.ReadString('file-system.SDataPath');
     if cSDataPath='' then cSDataPath:='data\sdata1\';
     CorrectPathSeparators(cSDataPath);
 
-    cTempPath:=ConfigReadString('file-system.TempPath');
+    cTempPath:=Config.ReadString('file-system.TempPath');
     if cTempPath='' then cTempPath:='data\tmp\';
     CorrectPathSeparators(cTempPath);
 
 
 
-    cSearchTempDir:=ConfigReadString('file-system.Search.TempDir');
+    cSearchTempDir:=Config.ReadString('file-system.Search.TempDir');
     if cSearchTempDir='' then cSearchTempDir:='data\search\';
     CorrectPathSeparators(cSearchTempDir);
 
-    cSearchLogFile:=ConfigReadString('file-system.Search.LogFile');
+    cSearchLogFile:=Config.ReadString('file-system.Search.LogFile');
     if cSearchLogFile='' then cSearchLogFile:='data\search.log';
     CorrectPathSeparators(cSearchLogFile);
 
-    cSearchFirstPath:=ConfigReadString('file-system.Search.FirstPath');
+    cSearchFirstPath:=Config.ReadString('file-system.Search.FirstPath');
     if cSearchFirstPath='' then cSearchFirstPath:='data\sdata1\';
     CorrectPathSeparators(cSearchFirstPath);
 
-    cSearchSecondPath:=ConfigReadString('file-system.Search.SecondPath');
+    cSearchSecondPath:=Config.ReadString('file-system.Search.SecondPath');
     if cSearchSecondPath='' then cSearchSecondPath:='data\sdata2\';
     CorrectPathSeparators(cSearchSecondPath);
 
