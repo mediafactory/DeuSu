@@ -1,17 +1,17 @@
 unit CacheFile;
 
 (*
-    DeuSu - An OpenSource Internet-Search-Engine
-    Copyright (C) 1999-2015 Michael Schoebel & Acoon GmbH
+  DeuSu - An OpenSource Internet-Search-Engine
+  Copyright (C) 1999-2015 Michael Schoebel & Acoon GmbH
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2 as
-    published by the Free Software Foundation.
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License version 2 as
+  published by the Free Software Foundation.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 *)
 
 interface
@@ -25,7 +25,7 @@ type
     FBuf: array [0..64*1024-1] of byte;
     FBufLen: int64;
     FBufStart: int64;
-    FFile: tFileStream;
+    FFile: TFileStream;
     FFileName: string;
     FPosition: int64;
     FSize: int64;
@@ -44,7 +44,7 @@ type
   strict protected
     FBuf: array [0..16*1024*1024-1] of byte;
     FBufLen: int64;
-    FFile: tFileStream;
+    FFile: TFileStream;
     FFileName: string;
     FSize: int64;
 
@@ -62,7 +62,7 @@ type
   strict protected
     FCacheData: array of byte;
     FCacheSize: int64;
-    FFile: tFileStream;
+    FFile: TFileStream;
     FFileName: string;
     FPosition: int64;
 
@@ -105,7 +105,7 @@ end;
 
 procedure TBufWriteFile.ReWrite;
 begin
-  FFile := tFileStream.Create(FFileName, fmCreate or fmShareDenyNone);
+  FFile := TFileStream.Create(FFileName, fmCreate or fmShareDenyNone);
   FBufLen := 0;
   FSize := 0;
 end;
@@ -114,7 +114,7 @@ end;
 
 procedure TBufWriteFile.Reset;
 begin
-  FFile := tFileStream.Create(FFileName,
+  FFile := TFileStream.Create(FFileName,
     fmOpenReadWrite or fmShareDenyNone);
   FBufLen := 0;
   FSize := 0;
@@ -180,7 +180,7 @@ end;
 
 procedure TCacheFile.Reset;
 begin
-  FFile := tFileStream.Create(FFileName, fmOpenRead or fmShareDenyNone);
+  FFile := TFileStream.Create(FFileName, fmOpenRead or fmShareDenyNone);
   FSize := FFile.Size;
 
   FPosition := 0;
@@ -294,11 +294,11 @@ begin
 
   if not FileExists(FFileName) then
   begin
-    FFile := tFileStream.Create(FFileName, fmCreate or Mode);
+    FFile := TFileStream.Create(FFileName, fmCreate or Mode);
     FFile.Free;
   end;
 
-  FFile := tFileStream.Create(FFileName, Mode, fmShareDenyNone);
+  FFile := TFileStream.Create(FFileName, Mode, fmShareDenyNone);
 end;
 
 
