@@ -17,466 +17,448 @@ unit CacheFile;
 interface
 
 uses
-    Classes;
+  Classes;
 
 type
-    TCacheFile = class
-        procedure Assign(fNam: string);
-        procedure Reset;
-        procedure Close;
-        procedure Read(var x; len: int64);
-        function FileSize: int64;
-        function FilePos: int64;
-        procedure Seek(Po: int64);
-        function Eof: boolean;
-    private
-        F: tFileStream;
-        Posi: int64;
-        Size: int64;
-        BufStart: int64;
-        BufLen: int64;
-        Buf: array [0 .. 64 * 1024 - 1] of byte;
-        FileName: string;
-    end;
+  TCacheFile = class
+  strict private
+    FBuf: array [0..64*1024-1] of byte;
+    FBufLen: int64;
+    FBufStart: int64;
+    FFile: tFileStream;
+    FFileName: string;
+    FPosition: int64;
+    FSize: int64;
+  public
+    procedure Assign(FileName: string);
+    procedure Close;
+    function Eof: boolean;
+    function FilePos: int64;
+    function FileSize: int64;
+    procedure Read(var Data; Len: int64);
+    procedure Reset;
+    procedure Seek(NewPosition: int64);
+  end;
 
-    TBufWriteFile = class
-        procedure Assign(fNam: string);
-        procedure ReWrite;
-        procedure Reset;
-        procedure Close;
-        procedure Write(var x; len: int64);
-        function FileSize: int64;
-    private
-        BufLen: int64;
-        Buf: array [0 .. 16 * 1024 * 1024 - 1] of byte;
-        FSize: int64;
-        FileName: string;
-        F: tFileStream;
+  TBufWriteFile = class
+  strict private
+    FBuf: array [0..16*1024*1024-1] of byte;
+    FBufLen: int64;
+    FFile: tFileStream;
+    FFileName: string;
+    FSize: int64;
 
-        procedure FlushBuffer;
-    end;
+    procedure FlushBuffer;
+  public
+    procedure Assign(FileName: string);
+    procedure Close;
+    function FileSize: int64;
+    procedure Reset;
+    procedure ReWrite;
+    procedure Write(var Data; Len: int64);
+  end;
 
+  TPreloadedFile = class
+  strict private
+    FCacheData: array of byte;
+    FCacheSize: int64;
+    FFile: tFileStream;
+    FFileName: string;
+    FPosition: int64;
+  public
+    procedure Assign(FileName: string);
+    procedure Close;
+    function Eof: boolean;
+    function FilePos: int64;
+    function FileSize: int64;
+    function IsPreloaded: boolean;
+    procedure OpenRead;
+    procedure OpenReadWrite;
+    procedure Preload;
+    procedure Read(var Data; Len: int64);
+    procedure Seek(NewPosition: int64);
+    procedure UnloadCache;
+    procedure Write(var Data; Len: int64);
+  end;
 
-    TPreloadedFile = class { Klassendeklaration für die TPreloadedFile Klasse }
-        constructor Create;
-        procedure Assign(fNam: string); // Die folgenden Namen sprechen für sich
-        procedure OpenRead;
-        procedure OpenReadWrite;
-        procedure Close;
-        procedure Read(var x; len: int64);
-        procedure Write(var x; len: int64);
-        function FileSize: int64;
-        function FilePos: int64;
-        procedure Seek(Po: int64);
-        function Eof: boolean;
-        procedure Preload;
-        procedure UnloadCache;
-        function IsPreloaded: boolean;
-    private
-        F: tFileStream;
-        FileName: string;
-        CacheSize: int64;
-        CacheData: array of byte;
-        Posi: int64;
-    end;
 
 
 implementation
 
 uses
-    SysUtils;
+  SysUtils;
 
 type
-    tBufArr = array [0 .. 1000000000] of byte;
-    pBufArr = ^tBufArr;
+  tBufArr = array [0..1000*1000*1000] of byte;
+  pBufArr = ^tBufArr;
 
 
-procedure TBufWriteFile.Assign;
+
+procedure TBufWriteFile.Assign(FileName: string);
 begin
-    FileName := fNam;
+  FFileName := FileName;
 end;
 
 
 
 procedure TBufWriteFile.ReWrite;
 begin
-    F := tFileStream.Create(FileName, fmCreate or fmShareDenyNone);
-    BufLen := 0;
-    FSize := 0;
+  FFile := tFileStream.Create(FFileName, fmCreate or fmShareDenyNone);
+  FBufLen := 0;
+  FSize := 0;
 end;
 
 
 
 procedure TBufWriteFile.Reset;
 begin
-    F := tFileStream.Create(FileName, fmOpenReadWrite or fmShareDenyNone);
-    BufLen := 0;
-    FSize := 0;
+  FFile := tFileStream.Create(FFileName,
+    fmOpenReadWrite or fmShareDenyNone);
+  FBufLen := 0;
+  FSize := 0;
 end;
+
 
 
 procedure TBufWriteFile.FlushBuffer;
 begin
-    if BufLen > 0 then
-    begin
-        F.Write(Buf, BufLen);
-        BufLen := 0;
-    end;
+  if FBufLen > 0 then
+  begin
+    FFile.Write(FBuf, FBufLen);
+    FBufLen := 0;
+  end;
 end;
+
 
 
 procedure TBufWriteFile.Close;
 begin
+  FlushBuffer;
+  FFile.Free;
+end;
+
+
+
+procedure TBufWriteFile.Write(var Data; Len: int64);
+begin
+  if ((FBufLen + Len) > SizeOf(FBuf)) and
+    (FBufLen > 0) then
     FlushBuffer;
-    F.Free;
+
+  if Len <= SizeOf(FBuf) then
+  begin
+    Move(Data, FBuf[FBufLen], Len);
+    Inc(FBufLen, Len);
+  end
+  else
+    FFile.Write(Data, Len);
+
+  Inc(FSize, Len);
 end;
 
 
 
-procedure TBufWriteFile.Write;
+function TBufWriteFile.FileSize:int64;
 begin
-    if ((BufLen + len) > SizeOf(Buf)) and (BufLen > 0) then
-    begin
-        FlushBuffer;
-    end;
-
-    if len <= SizeOf(Buf) then
-    begin
-        Move(x, Buf[BufLen], len);
-        Inc(BufLen, len);
-    end
-    else
-    begin
-        F.Write(x, len);
-    end;
-
-    Inc(FSize, len);
+  Result := FSize;
 end;
 
-
-
-function TBufWriteFile.FileSize;
-begin
-    Result := FSize;
-end;
 
 
 { ----------------------------------------------- }
 
 
-procedure TCacheFile.Assign;
+
+procedure TCacheFile.Assign(FileName: string);
 begin
-    FileName := fNam;
+  FFileName := FileName;
 end;
 
 
 
 procedure TCacheFile.Reset;
 begin
-    F := tFileStream.Create(FileName, fmOpenRead or fmShareDenyNone);
-    Size := F.Size;
+  FFile := tFileStream.Create(FFileName, fmOpenRead or fmShareDenyNone);
+  FSize := FFile.Size;
 
-    Posi := 0;
-    BufStart := -1;
-    BufLen := -1;
+  FPosition := 0;
+  FBufStart := -1;
+  FBufLen := -1;
 end;
 
 
 
 procedure TCacheFile.Close;
 begin
-    F.Free;
+  FFile.Free;
 end;
 
 
 
-procedure TCacheFile.Read;
+procedure TCacheFile.Read(var Data; Len: int64);
 var
-    pBuffer: pBufArr;
-    startAt: integer;
-    le: int64;
+  pBuffer: pBufArr;
+  startAt: integer;
+  Bytes: int64;
 begin
-    if (len = 1) and (Posi >= BufStart) and (Posi < BufStart + BufLen) then
+  if (Len = 1) and
+    (FPosition >= FBufStart) and
+    (FPosition < FBufStart + FBufLen) then
+  begin
+    Move(FBuf[FPosition - FBufStart], Data, 1);
+    Inc(FPosition);
+    exit;
+  end;
+
+  pBuffer := @Data;
+  startAt := 0;
+
+  while Len > 0 do
+  begin
+    if (FBufStart = -1) or
+      (FPosition < FBufStart) or
+      (FPosition >= (FBufStart + FBufLen)) then
     begin
-        Move(Buf[Posi - BufStart], x, 1);
-        Posi := Posi + 1;
-        exit;
+      FBufStart := FPosition;
+      FBufLen := FSize - FBufStart;
+      if FBufLen > SizeOf(FBuf) then
+        FBufLen := SizeOf(FBuf);
+
+      FFile.Position := FBufStart;
+      FFile.Read(FBuf, FBufLen);
     end;
 
-    pBuffer := @x;
-    startAt := 0;
+    Bytes := FBufLen + FBufStart - FPosition;
+    if Bytes > Len then Bytes := Len;
 
-    while len > 0 do
-    begin
-        if (BufStart = -1) or (Posi < BufStart) or (Posi >= (BufStart + BufLen)) then
-        begin
-            BufStart := Posi;
-            BufLen := Size - BufStart;
-            if BufLen > SizeOf(Buf) then
-            begin
-                BufLen := SizeOf(Buf);
-            end;
-
-            // F.Seek(BufStart, soFromBeginning);
-            F.Position := BufStart;
-            F.Read(Buf, BufLen);
-        end;
-
-        le := BufLen + BufStart - Posi;
-        if le > len then
-        begin
-            le := len;
-        end;
-
-        Move(Buf[Posi - BufStart], pBuffer^[startAt], le);
-        Inc(Posi, le);
-        Inc(startAt, le);
-        Dec(len, le);
-    end;
+    Move(FBuf[FPosition - FBufStart], pBuffer^[startAt], Bytes);
+    Inc(FPosition, Bytes);
+    Inc(startAt, Bytes);
+    Dec(Len, Bytes);
+  end;
 end;
 
 
 
-function TCacheFile.FileSize;
+function TCacheFile.FileSize:int64;
 begin
-    Result := Size;
+  Result := FSize;
 end;
 
 
 
-function TCacheFile.FilePos;
+function TCacheFile.FilePos:int64;
 begin
-    Result := Posi;
+  Result := FPosition;
 end;
 
 
 
-procedure TCacheFile.Seek;
+procedure TCacheFile.Seek(NewPosition: int64);
 begin
-    Posi := Po;
+  FPosition := NewPosition;
 end;
 
 
 
-function TCacheFile.Eof;
+function TCacheFile.Eof:boolean;
 begin
-    if Size > 0 then
-    begin
-        Result := Posi >= Size;
-    end
-    else
-    begin
-        Result := Posi = Size;
-    end;
+  if FSize > 0 then
+    Result := FPosition >= FSize
+  else
+    Result := FPosition = FSize;
 end;
+
 
 
 { -------------------------------------------- }
 
 
 
-constructor TPreloadedFile.Create;
+procedure TPreloadedFile.Assign(FileName: string);
 begin
-    inherited Create;
-    FileName := '';
-end;
-
-
-
-procedure TPreloadedFile.Assign;
-begin
-    FileName := fNam;
-    CacheSize := 0;
-    SetLength(CacheData, 1);
+  FFileName := FileName;
+  FCacheSize := 0;
+  SetLength(FCacheData, 1);
 end;
 
 
 
 procedure TPreloadedFile.OpenRead;
 begin
-    CacheSize := 0;
-    SetLength(CacheData, 1);
-    Posi := 0;
+  FCacheSize := 0;
+  SetLength(FCacheData, 1);
+  FPosition := 0;
 
-    if FileExists(FileName) then
-        F := tFileStream.Create(FileName, fmOpenRead or fmShareDenyNone)
-    else
-        F := tFileStream.Create(FileName, fmCreate or fmOpenRead, fmShareDenyNone)
+  if FileExists(FFileName) then
+    FFile := tFileStream.Create(FFileName,
+      fmOpenRead or fmShareDenyNone)
+  else
+    FFile := tFileStream.Create(FFileName, fmCreate or fmOpenRead,
+      fmShareDenyNone)
 end;
 
 
 
 procedure TPreloadedFile.OpenReadWrite;
 begin
-    CacheSize := 0;
-    SetLength(CacheData, 1);
-    Posi := 0;
-    if FileExists(FileName) then
-        F := tFileStream.Create(FileName, fmOpenReadWrite, fmShareDenyNone)
-    else
-        F := tFileStream.Create(FileName, fmCreate or fmOpenReadWrite, fmShareDenyNone)
+  FCacheSize := 0;
+  SetLength(FCacheData, 1);
+  FPosition := 0;
+  if FileExists(FFileName) then
+    FFile := tFileStream.Create(FFileName,
+      fmOpenReadWrite, fmShareDenyNone)
+  else
+    FFile := tFileStream.Create(FFileName, fmCreate or fmOpenReadWrite,
+      fmShareDenyNone)
 end;
 
 
 
 procedure TPreloadedFile.Close;
 begin
-    UnloadCache;
-    F.Free;
+  UnloadCache;
+  FFile.Free;
 end;
 
 
 
 procedure TPreloadedFile.UnloadCache;
 begin
-    if IsPreloaded then
+  if IsPreloaded then
+  begin
+    if FCacheSize <> 0 then
     begin
-        if CacheSize <> 0 then
-        begin
-            CacheSize := 0;
-            SetLength(CacheData, 1);
-        end;
+      FCacheSize := 0;
+      SetLength(FCacheData, 1);
     end;
+  end;
 end;
 
 
 
 procedure TPreloadedFile.Preload;
 var
-    oldFilePos: int64;
-    // s: string;
-    Po, len, Bytes: int64;
+  OldFilePos: int64;
+  Po, Len, Bytes: int64;
 begin
+  // Make sure we have NO cache before we create a new one
+  UnloadCache;
+
+
+  FCacheSize := FileSize;
+  try
+    SetLength(FCacheData, FCacheSize);
+  except
+    FCacheSize := 0;
+    SetLength(FCacheData, 1);
+    WriteLn(#13'Memory allocation in TPreloadedFile.Preload failed.');
+    exit;
+  end;
+
+  if (High(FCacheData) + 1) <> FCacheSize then
+  begin
+    FCacheSize := 0;
+    SetLength(FCacheData, 1);
+    WriteLn(#13'Memory allocation in TPreloadedFile.Preload failed.');
+    exit;
+  end;
+
+
+  OldFilePos := FilePos; // Remember the current file-position
+  try
+    FFile.Position := 0;
+    Po := 0;
+    Bytes := FCacheSize;
+    while Bytes > 0 do
+    begin
+      Len := Bytes;
+      if Len > 1048576 then Len := 1048576;
+
+      try
+        FCacheData[Po] := 0;
+      except
+        WriteLn('Oopsie... #1  High(CacheData)=', High(FCacheData));
+      end;
+
+      try
+        FFile.Read(FCacheData[Po], Len);
+      except
+        WriteLn('Oopsie... #2');
+      end;
+
+      Inc(Po, Len);
+      Dec(Bytes, Len);
+    end;
+  except
+    WriteLn(#13'Cache Preload in TPreloadedFile.Preload failed.');
+    WriteLn('ReadFile caused an exception.');
     UnloadCache;
-    { Sicherheitshalber eventuell bereits vorhandenen Cache leeren }
+  end;
 
-    CacheSize := FileSize;
-    // WriteLn('CacheSize=',CacheSize);
-    try
-        SetLength(CacheData, CacheSize);
-        // WriteLn('Cache has ',High(CacheData)+1,' bytes');
-        // ReadLn(s);
-    except
-        CacheSize := 0;
-        SetLength(CacheData, 1);
-        WriteLn(#13'Memory allocation in TPreloadedFile.Preload failed.');
-        exit;
-    end;
-    if (High(CacheData) + 1) <> CacheSize then
-    begin
-        CacheSize := 0;
-        SetLength(CacheData, 1);
-        WriteLn(#13'Memory allocation in TPreloadedFile.Preload failed.');
-        exit;
-    end;
-
-
-    oldFilePos := FilePos; { Alte Dateiposition merken }
-    try
-        // F.Seek(0, soFromBeginning);
-        F.Position := 0;
-        Po := 0;
-        Bytes := CacheSize;
-        while Bytes > 0 do
-        begin
-            len := Bytes;
-            if len > 1048576 then len := 1048576;
-            // WriteLn('Po=',Po);
-            try
-                CacheData[Po] := 0;
-            except
-                WriteLn('Oopsie... #1  High(CacheData)=', High(CacheData));
-            end;
-            try
-                F.Read(CacheData[Po], len);
-            except
-                WriteLn('Oopsie... #2');
-            end;
-            Inc(Po, len);
-            Dec(Bytes, len);
-        end;
-    except
-        WriteLn(#13'Cache Preload in TPreloadedFile.Preload failed.');
-        WriteLn('ReadFile caused an exception.');
-        UnloadCache;
-    end;
-
-    Seek(oldFilePos); { Zurück zur ursprünglichen Dateiposition }
+  Seek(OldFilePos); // Back to previous file-position
 end;
 
 
 
-procedure TPreloadedFile.Read;
+procedure TPreloadedFile.Read(var Data; Len: int64);
 begin
-    if IsPreloaded and ((Posi + len) <= CacheSize) then
-    { Ist der Bereich im Cache ? }
-    begin
-        Move(CacheData[Posi], x, len) { Ja, Daten aus Cache lesen }
-    end
-    else
-    begin
-        if F.Read(x, len) <> len then System.Write('Uh-oh... Read failed...');
-        { Nein, Lesezugriff an Windows weiterreichen }
-    end;
-    Inc(Posi, len); { Dateipointer mitbewegen }
+  // Is the data to be read completely within the cache?
+  if IsPreloaded and ((FPosition + Len) <= FCacheSize) then
+    Move(FCacheData[FPosition], Data, Len) // Read data from cache
+  else
+    if FFile.Read(Data, Len) <> Len then
+      System.Write('Uh-oh... Read failed...');
+
+  Inc(FPosition, Len);
 end;
 
 
 
-procedure TPreloadedFile.Write;
+procedure TPreloadedFile.Write(var Data; Len: int64);
 begin
-    if IsPreloaded and ((Posi + len) <= CacheSize) then
-    { Ist der Bereich im Cache ? }
-    begin
-        Move(x, CacheData[Posi], len);
-        { Ja, geänderte Daten im Cache aktualisieren }
-        { Achtung!! Der Fall, daß die zu schreibenden Daten teilweise das Cache-Ende
-          überlappen, wird NICHT abgefangen. Dies dürfte aufgrund der Benutzung in
-          ImportUrls aber auch nicht vorkommen. Damit dies passieren könnte, müßten
-          die Datenstrukturen in der URL-Datenbank bereits beschädigt sein,
-          und dann kommt eh jede Hilfe zu spät. }
-    end;
+  // Will the data to be written be completely within the cache?
+  if IsPreloaded and ((FPosition + Len) <= FCacheSize) then
+    Move(Data, FCacheData[FPosition], Len); // Write into cache
 
-    F.Write(x, len);
-    { Schreibzugriff an Windows weiterreichen }
-    Inc(Posi, len); { Dateipointer mitbewegen }
+  FFile.Write(Data, Len); // Also write to disk
+  Inc(FPosition, Len);
 end;
 
 
 
-function TPreloadedFile.FileSize;
+function TPreloadedFile.FileSize:int64;
 begin
-    Result := F.Size; { Dateigröße ermitteln }
+  Result := FFile.Size;
 end;
 
 
 
 function TPreloadedFile.IsPreloaded: boolean;
 begin
-    Result := High(CacheData) > 0;
+  Result := High(FCacheData) > 0;
 end;
 
 
 
-function TPreloadedFile.FilePos;
+function TPreloadedFile.FilePos:int64;
 begin
-    Result := Posi; { Dateiposition ermitteln }
+  Result := FPosition;
 end;
 
 
 
-procedure TPreloadedFile.Seek;
+procedure TPreloadedFile.Seek(NewPosition: int64);
 begin
-    // F.Seek(po, soFromBeginning);
-    F.Position := Po;
-    Posi := Po;
+  FFile.Position := NewPosition;
+  FPosition := NewPosition;
 end;
 
 
 
-function TPreloadedFile.Eof;
+function TPreloadedFile.Eof:boolean;
 begin
-    Result := FilePos >= FileSize; { Sind wir am Ende der datei angelangt ? }
+  Result := FilePos >= FileSize;
 end;
 
 
