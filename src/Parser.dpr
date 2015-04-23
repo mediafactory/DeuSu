@@ -67,12 +67,12 @@ begin
     WriteLn;
 
     // SetThreadPriority(GetCurrentThread, Thread_Priority_Below_Normal);
-    MaxBufLen := ConfigReadIntegerDefault('index.max-page-size', 200 * 1024);
+    MaxBufLen := Config.ReadIntegerDefault('index.max-page-size', 200 * 1024);
     if MaxBufLen < 10240 then
         MaxBufLen := 10240;
     if MaxBufLen > 16 * 1024 * 1024 then
         MaxBufLen := 16 * 1024 * 1024;
-    IndexLanguage := LowerCase(ConfigReadStringDefault('index.language', 'all'));
+    IndexLanguage := LowerCase(Config.ReadStringDefault('index.language', 'all'));
 
     FollowLinks := true;
     ProcessBackLinks := true;

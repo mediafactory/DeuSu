@@ -592,12 +592,12 @@ begin
     WriteLn(cGPLNotice);
     WriteLn;
 
-    MaxUrlsPerHost := ConfigReadIntegerDefault('robot.MaxUrlsPerHost', 5);
+    MaxUrlsPerHost := Config.ReadIntegerDefault('robot.MaxUrlsPerHost', 5);
     if MaxUrlsPerHost < 1 then MaxUrlsPerHost := 1;
     if MaxUrlsPerHost > 10000 then MaxUrlsPerHost := 10000;
 
     CountMaxUrlsPerPart :=
-    LowerCase(ConfigReadString('robot.CountMaxUrlsPerPart')) = 'true';
+    LowerCase(Config.ReadString('robot.CountMaxUrlsPerPart')) = 'true';
 
     if ParamCount = 0 then { Keine Parameter angegeben. Kurze Hilfemeldung anzeigen }
     begin
