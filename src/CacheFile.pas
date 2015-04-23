@@ -21,7 +21,7 @@ uses
 
 type
   TCacheFile = class
-  strict private
+  strict protected
     FBuf: array [0..64*1024-1] of byte;
     FBufLen: int64;
     FBufStart: int64;
@@ -41,7 +41,7 @@ type
   end;
 
   TBufWriteFile = class
-  strict private
+  strict protected
     FBuf: array [0..16*1024*1024-1] of byte;
     FBufLen: int64;
     FFile: tFileStream;
@@ -59,12 +59,14 @@ type
   end;
 
   TPreloadedFile = class
-  strict private
+  strict protected
     FCacheData: array of byte;
     FCacheSize: int64;
     FFile: tFileStream;
     FFileName: string;
     FPosition: int64;
+
+    procedure Open(Mode: word);
   public
     procedure Assign(FileName: string);
     procedure Close;
@@ -284,33 +286,33 @@ end;
 
 
 
-procedure TPreloadedFile.OpenRead;
+procedure TPreloadedFile.Open(Mode: word);
 begin
   FCacheSize := 0;
   SetLength(FCacheData, 1);
   FPosition := 0;
 
-  if FileExists(FFileName) then
-    FFile := tFileStream.Create(FFileName,
-      fmOpenRead or fmShareDenyNone)
-  else
-    FFile := tFileStream.Create(FFileName, fmCreate or fmOpenRead,
-      fmShareDenyNone)
+  if not FileExists(FFileName) then
+  begin
+    FFile := tFileStream.Create(FFileName, fmCreate or Mode);
+    FFile.Free;
+  end;
+
+  FFile := tFileStream.Create(FFileName, Mode, fmShareDenyNone);
+end;
+
+
+
+procedure TPreloadedFile.OpenRead;
+begin
+  Open(fmOpenRead);
 end;
 
 
 
 procedure TPreloadedFile.OpenReadWrite;
 begin
-  FCacheSize := 0;
-  SetLength(FCacheData, 1);
-  FPosition := 0;
-  if FileExists(FFileName) then
-    FFile := tFileStream.Create(FFileName,
-      fmOpenReadWrite, fmShareDenyNone)
-  else
-    FFile := tFileStream.Create(FFileName, fmCreate or fmOpenReadWrite,
-      fmShareDenyNone)
+  Open(fmOpenReadWrite);
 end;
 
 
