@@ -294,6 +294,12 @@ begin
 
   if not FileExists(FFileName) then
   begin
+    (*
+      Create the file and close it again. This is necessary as
+      Windows would ignore fmShareDenyNone if fmCreate is also used.
+      So we need to *always* open an already existing file with
+      fmShareDenyNone.
+    *)
     FFile := TFileStream.Create(FFileName, fmCreate or Mode);
     FFile.Free;
   end;
