@@ -16,7 +16,7 @@ compiler=$compiler" -Fusrc/dep/indy10/Lib/*"
 # line to match your setup!
 #
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-compiler=$compiler" -Fu/usr/lib64/fpc/2.6.4/units/x86_64-linux/*"
+compiler=$compiler" -Fu/usr/local/lib/fpc/2.6.4/units/x86_64-linux/*"
 compiler=$compiler" -FEbin -FUbin/units"
 
 
