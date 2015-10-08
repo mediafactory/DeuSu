@@ -29,6 +29,7 @@ function compile {
 compile src/RobotNew
 compile src/searchservernew
 compile src/ImportUrls
+compile src/ImportAlexa
 compile src/CleanUrlsTxt
 compile src/PrepareRobot
 compile src/ImportData

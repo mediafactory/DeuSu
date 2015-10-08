@@ -30,6 +30,9 @@ if errorlevel 1 goto Error
 %Compiler% ImportUrls.dpr
 if errorlevel 1 goto Error
 
+%Compiler% ImportAlexa.dpr
+if errorlevel 1 goto Error
+
 %Compiler% CleanUrlsTxt.dpr
 if errorlevel 1 goto Error
 
