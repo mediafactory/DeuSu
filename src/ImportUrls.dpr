@@ -355,6 +355,8 @@ begin
             CloseFile(RRFile);
             if StartDbNr < 0 then StartDbNr := 0;
             if StartDbNr > (cDbCount - 1) then StartDbNr := cDbCount - 1;
+            EndDbNr := StartDbNr - 1;
+            if EndDbNr < 0 then EndDbNr := cDbCount -1;
         end;
     end
     else DeleteFile(cRoundRobinFile);
