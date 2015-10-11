@@ -34,6 +34,7 @@ type
 	    ResponseBuffer: AnsiString;
 	    ResponseBufferIsValid: boolean;
 	    ReadPos: int32;
+		StartTime: int64;
 
 	    procedure SetDefaults;
 	    procedure SetupClient;
@@ -79,7 +80,9 @@ type
 
 implementation
 
-
+uses
+	Logging;
+	
 
 
 
@@ -140,10 +143,15 @@ end;
 
 procedure tHttpGet.Get;
 begin
+	// LogMsg('robot.log','HttpGet1');
     SetupClient;
+	// LogMsg('robot.log','HttpGet2');
     if ErrorCode = 0 then Connect;
+	// LogMsg('robot.log','HttpGet3');
     if ErrorCode = 0 then SendRequest;
+	// LogMsg('robot.log','HttpGet4');
     if ErrorCode = 0 then ReceiveData;
+	// LogMsg('robot.log','HttpGet5');
 end;
 
 
@@ -158,9 +166,11 @@ begin
 
     if ErrorCode = 0 then
     begin
-	Client.Host := Ip2Str(IP);
-	Client.Port := Port;
+		Client.Host := Ip2Str(IP);
+		Client.Port := Port;
     end;
+	
+	StartTime := Ticks;
 end;
 
 
@@ -221,16 +231,19 @@ end;
 procedure tHttpGet.ReceiveData;
 begin
     try
-	while (ErrorCode = 0) and (Client.Socket.Connected) and
-	    (not Client.Socket.ClosedGracefully) do
-	    ReadChunk;
+		while (ErrorCode = 0) and (Client.Socket.Connected) and
+			(not Client.Socket.ClosedGracefully) do
+		begin
+			if ( (Ticks-StartTime) > 60000 ) then ErrorCode := 40
+			else ReadChunk;
+		end;
 
-	// Check for data once more. In my tests this was never
-	// necessary, but it could be. Better safe than sorry.
-	if ErrorCode = 0 then ReadChunk;
+		// Check for data once more. In my tests this was never
+		// necessary, but it could be. Better safe than sorry.
+		if ErrorCode = 0 then ReadChunk;
 
     except
-	ErrorCode := 40;
+		ErrorCode := 40;
     end;
 end;
 

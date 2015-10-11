@@ -39,8 +39,8 @@ const
     cIs64Bit = '';
 {$endif}
 
-    cShortVersion = '5.0.2';
-    cDate = '22-Apr-2015';
+    cShortVersion = '5.0.3';
+    cDate = '11-Oct-2015';
     cVersion = cShortVersion + ' '+cIs64Bit+' '+cDate;
 
     cCopyright = '(c) 1999-2015 Michael Schoebel & Acoon GmbH';

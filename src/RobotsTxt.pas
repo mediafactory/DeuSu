@@ -112,9 +112,10 @@ var
     Redirects: integer;
     ReadyToExit: boolean;
     RobotsTxtUrl: String;
-    ThisIP: tIP4;
+    i: integer;
 begin
     //SetThreadPriority(GetCurrentThread, THREAD_PRIORITY_BELOW_NORMAL);
+    // LogMsg('robot.log','Entering RobotsTxt');
     DebugLogMsg('robot.log', 'Hostname=' + CacheElement.HostName);
     CacheElement.IP := GetIP4ByHostName(AnsiString(CacheElement.HostName));
     DebugLogMsg('robot.log', 'IP for ' + CacheElement.HostName + ' is ' + Ip2Str(CacheElement.IP));
@@ -122,20 +123,34 @@ begin
     begin
         CacheElement.StatusCode := 950; // This will ensure that no actual URLs will be crawled from this host
         CacheElement.Valid := true;
+        // LogMsg('robot.log','Exiting#1 RobotsTxt');
         exit;
     end;
 
     Redirects := 0;
     RobotsTxtUrl := CacheElement.HostName + '/robots.txt';
-    ThisIP := CacheElement.IP;
 
     repeat
-        DebugLogMsg('robot.log', 'RobotsTxt at "' + RobotsTxtUrl + '"');
+        // LogMsg('robot.log', 'RobotsTxt at "' + RobotsTxtUrl + '"');
+
         Cl := tHttpGet.Create;
-	Cl.Host := CacheElement.HostName;
-	Cl.IP := CacheElement.IP;
-	Cl.Path := '/robots.txt';
-	Cl.Get;
+		Cl.UserAgent := HTTPClientDefaultUserAgent;
+
+        i := Pos('/', RobotsTxtUrl);
+        Cl.Host := LowerCase( copy(RobotsTxtUrl, 1, i-1) );
+        Cl.Path := copy(RobotsTxtUrl, i, Length(RobotsTxtUrl)-i+1);
+        Cl.IP := GetIP4ByHostName(Cl.Host);
+        if (Cl.IP.IP = 0) then
+        begin
+            Cl.Free;
+            CacheElement.StatusCode := 950;
+            CacheElement.Valid := true;
+            // LogMsg('robot.log','Exiting#2 RobotsTxt');
+            exit;
+        end;
+		// LogMsg('robot.log','BeforeGet RobotsTxt');
+		Cl.Get;
+		// LogMsg('robot.log','AfterGet RobotsTxt');
 
         ReadyToExit := true;
         if (Cl.ErrorCode = 0) and (Redirects < 5) then
@@ -155,12 +170,11 @@ begin
                     begin
                         Delete(s, 1, 9);
                         s := Trim(s);
-                        DebugLogMsg('robot.log', 'Found new location ' + s);
+                        // LogMsg('robot.log', CacheElement.HostName + 'robots.txt relocated to ' + s);
                         if LowerCase(copy(s, 1, 7)) = 'http://' then Delete(s, 1, 7);
                         if LowerCase(copy(s, 1, 8)) = 'https://' then Delete(s, 1, 8);
                         DebugLogMsg('robot.log', 'Setting robots.txt to ' + s);
                         RobotsTxtUrl := s;
-                        ThisIP.IP := 0;
                         ReadyToExit := false;
                         Cl.Free;
                         Cl:=nil;
@@ -169,10 +183,21 @@ begin
                 end;
                 if Assigned(Cl) then Cl.Seek(0);
             end;
+        end;
 
+        if Redirects >= 5 then
+        begin
+            if Assigned(Cl) then Cl.Free;
+            CacheElement.StatusCode := 950;
+            CacheElement.Valid := true;
+            // LogMsg('robot.log','Exiting#3 RobotsTxt');
+            exit;
         end;
     until ReadyToExit;
 
+
+
+    // LogMsg('robot.log', 'Done fetching. ErrorCode='+IntToStr(Cl.ErrorCode));
 
     if Cl.ErrorCode = 0 then
     begin
@@ -208,6 +233,7 @@ begin
     except
     end;
 
+    // LogMsg('robot.log','Exiting#4 RobotsTxt');
     CacheElement.Valid := true;
 end;
 
