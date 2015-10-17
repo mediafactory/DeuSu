@@ -152,7 +152,7 @@ begin
     end;
 
     // Calculate the highest DocId that will still fit into the RWI data-structures
-    MaxAllowedDocId := (512 * 1024 * 1024 div cDbCount) - 1;
+    MaxAllowedDocId := (512 * 1024 * 1024) - 1;
 
     DocumentID := 0;
 
@@ -307,7 +307,7 @@ begin
             end;
 
             // Make sure that there will not be DocIDs that will overflow the RWI data-structures
-            if An >= MaxAllowedDocId then break;
+            if DocumentID >= MaxAllowedDocId then break;
         end;
 
         Inf.Close;
