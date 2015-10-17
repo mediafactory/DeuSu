@@ -60,6 +60,7 @@ var
     WordOccurences: int64;
     BackLinksFromAge: boolean;
     OutputDir: string;
+    BeginWithShard, EndWithShard: int32;
     // FilterAn: integer;
     // FiAn: array[1..8] of integer;
     // Fi: array[1..8,1..2000] of pstr255;
@@ -113,7 +114,7 @@ end;
 procedure DoPass1;
 var
     Inf: tCacheFile;
-    UrlDat: tBufWriteFile;
+    UrlDat: array[0..cDbCount-1] of tBufWriteFile;
     An: integer;
     PageInfo: tPageInfo;
     TempKey: array [0 .. 63] of tBufWriteFile;
@@ -121,10 +122,11 @@ var
     IgTmp: ShortString;
     DoAdd: boolean;
     ThisTime, StartTime, Sec: int64;
-    UrlPtr: integer;
+    DocumentID: uint32;
+    ShardNr: int32;
     b: byte;
     // p: pstr255;
-    FilterOut: tBufWriteFile;
+    FilterOut: array[0..cDbCount-1] of tBufWriteFile;
     ThisKeyword: ShortString;
     RankingFlags: byte;
     MaxAllowedDocId: uint32;
@@ -152,17 +154,24 @@ begin
     // Calculate the highest DocId that will still fit into the RWI data-structures
     MaxAllowedDocId := (512 * 1024 * 1024 div cDbCount) - 1;
 
-    for DbNr := 0 to (cDbCount - 1) do
+    DocumentID := 0;
+
+    for DbNr := 0 to cDbCount-1 do
     begin
-        UrlDat := tBufWriteFile.Create;
-        UrlDat.Assign(OutputDir + 'urls.dat' + IntToStr(DbNr));
-        UrlDat.ReWrite;
+        UrlDat[DbNr] := tBufWriteFile.Create;
+        UrlDat[DbNr].Assign(OutputDir + 'urls.dat' + IntToStr(DbNr));
+        UrlDat[DbNr].ReWrite;
+
+        FilterOut[DbNr] := tBufWriteFile.Create;
+        FilterOut[DbNr].Assign(OutputDir + 'filter.dat' + IntToStr(DbNr));
+        FilterOut[DbNr].ReWrite;
+    end;
+
+    for DbNr := BeginWithShard to EndWithShard do
+    begin
         Inf := tCacheFile.Create;
         Inf.Assign(cInfDb + IntToStr(DbNr));
         Inf.Reset;
-        FilterOut := tBufWriteFile.Create;
-        FilterOut.Assign(OutputDir + 'filter.dat' + IntToStr(DbNr));
-        FilterOut.ReWrite;
 
         An := 0;
         StartTime := GetTickCount;
@@ -213,7 +222,7 @@ begin
                 (Pos(#39, PageInfo.Url) = 0);
                 if DoAdd then
                 begin
-                    UrlPtr := (An shl cDbBits) or DbNr;
+                    ShardNr := DocumentID and (cDbCount-1);
                     for i := 1 to PageInfo.WordCount do
                     begin
                         Inf.Read(RankingFlags, 1);
@@ -222,15 +231,14 @@ begin
                         j := CalcCRC(ThisKeyword) and 63;
                         TempKey[j].Write(RankingFlags, 1);
                         TempKey[j].Write(ThisKeyword[0], Length(ThisKeyword) + 1);
-                        TempKey[j].Write(UrlPtr, 4);
+                        TempKey[j].Write(DocumentID, 4);
                     end;
 
                     PageInfo.Title := Trim(PageInfo.Title);
                     PageInfo.Description := Trim(PageInfo.Description);
-                    UrlDat.Write(PageInfo.Url, SizeOf(PageInfo.Url));
-                    UrlDat.Write(PageInfo.Title, SizeOf(PageInfo.Title));
-                    UrlDat.Write(PageInfo.Description,
-                    SizeOf(PageInfo.Description));
+                    UrlDat[ShardNr].Write(PageInfo.Url, SizeOf(PageInfo.Url));
+                    UrlDat[ShardNr].Write(PageInfo.Title, SizeOf(PageInfo.Title));
+                    UrlDat[ShardNr].Write(PageInfo.Description, SizeOf(PageInfo.Description));
 
                     S := LowerCase(PageInfo.Url);
                     S[Length(S) + 1] := #0;
@@ -253,7 +261,7 @@ begin
                         i := 0;
                     b := b or i;
 
-                    FilterOut.Write(b, SizeOf(b));
+                    FilterOut[ShardNr].Write(b, SizeOf(b));
 
                     Inc(An);
                     if (An and 8191) = 0 then
@@ -274,6 +282,8 @@ begin
                             ' remaining       ');
                         end;
                     end;
+
+                    Inc( DocumentID );
                 end
                 else
                 begin // Do NOT add
@@ -300,15 +310,21 @@ begin
             if An >= MaxAllowedDocId then break;
         end;
 
-        FilterOut.Close;
-        FilterOut.Free;
-        UrlDat.Close;
-        UrlDat.Free;
         Inf.Close;
         Inf.Free;
         WriteLn(#13, DbNr, ' ', '100.0% complete. (', An,
         ' URLs)                                            ');
     end;
+
+    for DbNr := 0 to cDbCount-1 do
+    begin
+        UrlDat[DbNr].Close;
+        UrlDat[DbNr].Free;
+
+        FilterOut[DbNr].Close;
+        FilterOut[DbNr].Free;
+    end;
+
 
     for i := 0 to 63 do
     begin
@@ -1084,6 +1100,8 @@ var
 begin
     BackLinksFromAge := false;
     OutputDir := cSDataPath;
+    BeginWithShard := 0;
+    EndWithShard := cDbCount-1;
 
     i := 1;
     while i <= ParamCount do
@@ -1096,6 +1114,20 @@ begin
             Inc(i);
             OutputDir := ParamStr(i);
             if OutputDir = '' then OutputDir := cSDataPath;
+        end;
+
+        if (S = '-beginshard') then
+        begin
+            Inc(i);
+            BeginWithShard := StrToIntDef(ParamStr(i),0);
+            if BeginWithShard < 0 then BeginWithShard := 0;
+        end;
+
+        if (S = '-endshard') then
+        begin
+            Inc(i);
+            EndWithShard := StrToIntDef(ParamStr(i),0);
+            if EndWithShard > (cDbCount - 1) then EndWithShard := cDbCount - 1;
         end;
 
         Inc(i);
