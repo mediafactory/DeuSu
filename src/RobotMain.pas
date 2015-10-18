@@ -74,6 +74,7 @@ implementation
 uses
     FileLocation,
     RobotsTxt,
+    RobotGlobal,
     RobotGetUrl,
     HTTPClient,
     Config,

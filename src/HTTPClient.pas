@@ -61,9 +61,6 @@ type
         procedure WaitForCompletion(TimeOut: int32); // TimeOut in MilliSekunden
     end;
 
-var
-    HTTPClientDefaultMaxSize: int32;
-    HTTPClientDefaultUserAgent: AnsiString;
 
 procedure CountFailedConnection;
 function GetAndResetFailedConnectionCount: integer;
@@ -457,7 +454,7 @@ end;
 begin
     HTTPClientDefaultMaxSize := 200 * 1024;
     HTTPClientDefaultUserAgent :=
-    'Acoon-Robot ' + cShortVersion + ' (http://www.acoon.de)';
+        'DeuSu-Robot ' + cShortVersion + ' (https://deusu.de)';
     FailedCS := tCriticalSection.Create;
     FailedConnections := 0;
 
