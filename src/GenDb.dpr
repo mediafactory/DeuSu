@@ -108,13 +108,102 @@ begin
 end;
 
 
+function CalcDomainData(const Url: ShortString): byte;
+var
+    S: ShortString;
+    Slashes, i: integer;
+    PathElements, HostElements: byte;
+begin
+    S := Url;
+    Slashes := 0;
+    for i := 1 to Length(S) do
+        if S[i] = '/' then
+            Inc(Slashes);
+
+    // if (Slashes = 1) and (s[Length(s)] = '/') then
+    // SetLength(s, Length(s) - 1);
+
+    PathElements := Slashes + 1;
+    if S[Length(S)] = '/' then
+        Dec(PathElements);
+
+    for i := 1 to Length(S) do
+        if S[i] = '/' then
+        begin
+            SetLength(S, i - 1);
+            break;
+        end;
+
+    HostElements := 1;
+    for i := 1 to Length(S) do
+        if S[i] = '.' then
+            Inc(HostElements);
+
+
+    if PathElements > 15 then
+        PathElements := 15;
+    if HostElements > 15 then
+        HostElements := 15;
+
+    (* WriteLn;
+      WriteLn(Url);
+      WriteLn(Slashes);
+      WriteLn('PathElements=',PathElements);
+      WriteLn('HostElements=',HostElements); *)
+
+    Result := (PathElements shl 4) or HostElements;
+end;
+
+
+
+function GetBackLinkCount(fUrls: tPreloadedFile; const Url: AnsiString):int64;
+var
+    BackLinks: int64;
+    LowerUrl: string;
+    HashCode, Po: int64;
+    UrlData: tUrlData;
+begin
+    BackLinks := 1;
+    LowerUrl := LowerCase(Url);
+    HashCode := HashOfUrl(Url);
+    Po := HashCode * 4;
+    while Po <> 0 do
+    begin
+        try
+            fUrls.Seek(Po);
+            fUrls.Read(UrlData, SizeOf(UrlData));
+        except
+            WriteLn(#13, 'Cannot find URL: ', UrlData.Url);
+            Po := 0;
+            break;
+        end;
+
+        if LowerUrl = LowerCase(UrlData.Url) then
+        begin
+            BackLinks := UrlData.InLinkCount;
+            break;
+        end;
+        if Po = UrlData.Next then
+        begin
+            WriteLn(#13'Self=Next at ', UrlData.Url);
+            Po := 0;
+            break;
+        end;
+        Po := UrlData.Next;
+    end;
+
+    Result := BackLinks;
+end;
+
+
+
 { ---------------------------------------------------------- }
 
 
 procedure DoPass1;
 var
     Inf: tCacheFile;
-    UrlDat: array[0..cDbCount-1] of tBufWriteFile;
+    UrlDat, fOut, fOut2, fBackLinks: array[0..cDbCount-1] of tBufWriteFile;
     An: integer;
     PageInfo: tPageInfo;
     TempKey: array [0 .. 63] of tBufWriteFile;
@@ -130,6 +219,11 @@ var
     ThisKeyword: ShortString;
     RankingFlags: byte;
     MaxAllowedDocId: uint32;
+    DomainRanks: tDomainRank;
+    Rank: int32;
+    fUrls: tPreloadedFile;
+    CurrentTime: double;
+    BackLinks: int64;
 begin
     WriteLn('Pass 1 - Preparing URL-data');
 
@@ -143,6 +237,9 @@ begin
 
     // FillChar(FiAn,SizeOf(FiAn),0);
     // FilterAn:=0;
+
+    DomainRanks := tDomainRank.Create;
+    CurrentTime := Now;
 
     for i := 0 to 63 do
     begin
@@ -165,10 +262,28 @@ begin
         FilterOut[DbNr] := tBufWriteFile.Create;
         FilterOut[DbNr].Assign(OutputDir + 'filter.dat' + IntToStr(DbNr));
         FilterOut[DbNr].ReWrite;
+
+        fOut[DbNr] := tBufWriteFile.Create;
+        fOut[DbNr].Assign(OutputDir + 'rank.dat' + IntToStr(DbNr));
+        fOut[DbNr].ReWrite;
+
+        fOut2[DbNr] := tBufWriteFile.Create;
+        fOut2[DbNr].Assign(OutputDir + 'rank2.dat' + IntToStr(DbNr));
+        fOut2[DbNr].ReWrite;
+
+        fBackLinks[DbNr] := tBufWriteFile.Create;
+        fBackLinks[DbNr].Assign(OutputDir + 'backlink.dat' + IntToStr(DbNr));
+        fBackLinks[DbNr].ReWrite;
     end;
 
     for DbNr := BeginWithShard to EndWithShard do
     begin
+        fUrls := tPreloadedFile.Create;
+        fUrls.Assign(cUrlDb + IntToStr(DbNr));
+        fUrls.OpenRead;
+        Write(' Loading Url-Data... ');
+        fUrls.Preload;
+
         Inf := tCacheFile.Create;
         Inf.Assign(cInfDb + IntToStr(DbNr));
         Inf.Reset;
@@ -240,6 +355,26 @@ begin
                     UrlDat[ShardNr].Write(PageInfo.Title, SizeOf(PageInfo.Title));
                     UrlDat[ShardNr].Write(PageInfo.Description, SizeOf(PageInfo.Description));
 
+
+                    BackLinks := GetBackLinkCount(fUrls, PageInfo.Url);
+                    if BackLinksFromAge then
+                      BackLinks:=Trunc(1000.0/(CurrentTime+0.1-(0.001*BackLinks)));
+                    if BackLinks<1 then BackLinks:=1;
+                    fBackLinks[ShardNr].Write(BackLinks, SizeOf(BackLinks));
+
+
+
+                    Rank := DomainRanks.GetDomainRanking(PageInfo.Url);
+                    fOut[ShardNr].Write(Rank, SizeOf(Rank));
+
+                    s := PageInfo.Url;
+                    if LowerCase(string(copy(s, 1, 4))) = 'www.' then
+                        delete(s, 1, 4);
+                    b := CalcDomainData(s);
+                    fOut2[ShardNr].Write(b, 1);
+
+
+
                     S := LowerCase(PageInfo.Url);
                     S[Length(S) + 1] := #0;
                     b := 0;
@@ -283,6 +418,8 @@ begin
                         end;
                     end;
 
+
+
                     Inc( DocumentID );
                 end
                 else
@@ -312,6 +449,10 @@ begin
 
         Inf.Close;
         Inf.Free;
+
+        fUrls.Close;
+        fUrls.Free;
+
         WriteLn(#13, DbNr, ' ', '100.0% complete. (', An,
         ' URLs)                                            ');
     end;
@@ -323,6 +464,15 @@ begin
 
         FilterOut[DbNr].Close;
         FilterOut[DbNr].Free;
+
+        fOut[DbNr].Close;
+        fOut[DbNr].Free;
+
+        fOut2[DbNr].Close;
+        fOut2[DbNr].Free;
+
+        fBackLinks[DbNr].Close;
+        fBackLinks[DbNr].Free;
     end;
 
 
@@ -765,53 +915,6 @@ var
     fOut, fOut2: tBufWriteFile;
     b: byte;
 
-    function CalcDomainData(const Url: ShortString): byte;
-    var
-        S: ShortString;
-        Slashes, i: integer;
-        PathElements, HostElements: byte;
-    begin
-        S := Url;
-        Slashes := 0;
-        for i := 1 to Length(S) do
-            if S[i] = '/' then
-                Inc(Slashes);
-
-        // if (Slashes = 1) and (s[Length(s)] = '/') then
-        // SetLength(s, Length(s) - 1);
-
-        PathElements := Slashes + 1;
-        if S[Length(S)] = '/' then
-            Dec(PathElements);
-
-        for i := 1 to Length(S) do
-            if S[i] = '/' then
-            begin
-                SetLength(S, i - 1);
-                break;
-            end;
-
-        HostElements := 1;
-        for i := 1 to Length(S) do
-            if S[i] = '.' then
-                Inc(HostElements);
-
-
-        if PathElements > 15 then
-            PathElements := 15;
-        if HostElements > 15 then
-            HostElements := 15;
-
-        (* WriteLn;
-          WriteLn(Url);
-          WriteLn(Slashes);
-          WriteLn('PathElements=',PathElements);
-          WriteLn('HostElements=',HostElements); *)
-
-        Result := (PathElements shl 4) or HostElements;
-    end;
-
-
 begin
     DomainRanks := tDomainRank.Create;
 
@@ -1208,17 +1311,17 @@ begin
         DoPass3;
     WriteProgress;
 
-    if Progress.Pass = 3 then
+    (*if Progress.Pass = 3 then
         DoPass4;
-    WriteProgress;
+    WriteProgress;*)
 
-    if Progress.Pass = 4 then
+    if Progress.Pass = 3 then
         DoPass5;
     WriteProgress;
 
-    if Progress.Pass = 5 then
+    (*if Progress.Pass = 5 then
         DoPass6; // Backlink-Counts
-    WriteProgress;
+    WriteProgress; *)
 
     AssignFile(F, OutputDir + 'ready2.dat');
     ReWrite(F, 1);
