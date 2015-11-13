@@ -1707,147 +1707,6 @@ begin
 end;
 
 
-procedure ReadQueryFromFile(FNam: string);
-var
-    Tries: integer;
-begin
-    FileMode := 0;
-    Tries := 0;
-    repeat
-        AssignFile(f, cSearchTempDir + 'a' + FNam);
-        try
-            Reset(f);
-            Tries := -1;
-        except
-            AddToMemo(DateToStr(Date) + ' ' + TimeToStr(Time) + ': ' + IntToStr
-            (Tries) + ': Sharing violation');
-            Inc(Tries);
-            Sleep(250);
-        end;
-    until (Tries = -1) or (Tries = 10);
-
-    if Tries = -1 then
-    begin // this means we had success in opening the file containing the query
-        ReadLn(f, MainQS);
-        CloseFile(f);
-    end
-    else
-    begin
-        MainQS := '';
-        AddToMemo('Fatal error');
-    end;
-end;
-
-
-procedure CreateOutputFile(FNam: string);
-begin
-    FileMode := 2;
-    AssignFile(f, cSearchTempDir + 'b' + FNam);
-    try
-        ReWrite(f);
-    except
-        // MessageBeep(0);
-        halt;
-    end;
-end;
-
-
-(*
-procedure CheckForQueries;
-var
-    Sr: tSearchRec;
-    Code: integer;
-    FNam: string;
-    s: string;
-    Ti, Ti2, Ti3: int64;
-    Li: tStringList;
-    i: integer;
-begin
-    Li := tStringList.Create;
-    Li.Sorted := false;
-    Li.Duplicates := dupAccept;
-
-    HandleCacheRefresh;
-
-    Code := FindFirst(cSearchTempDir + 'a*', faAnyFile, Sr);
-    while Code = 0 do
-    begin
-        try
-            CritSec.Enter;
-
-            FNam := Sr.Name;
-            Delete(FNam, 1, 1);
-
-            ReadQueryFromFile(FNam);
-            CreateOutputFile(FNam);
-
-            Ti := GetTickCount;
-
-            ProcessQueryParameters;
-            PreferEn := true;
-            OpenSnippetDatabases;
-
-            Ti2 := GetTickCount;
-            QueryPass := 2;
-            FindKeys;
-            Ti3 := GetTickCount;
-            Li.Clear;
-            GenResults(Li);
-            for i := 0 to Li.Count - 1 do
-                WriteLn(f, Li.Strings[i]);
-            CloseSnippetDatabases;
-
-            Inc(Searchs);
-            Ti := GetTickCount - Ti;
-            if Ti < 0 then
-                Ti := 0;
-            Ticks := Ticks + Ti;
-            if Ti < MinTicks then
-                MinTicks := Ti;
-            if Ti > MaxTicks then
-                MaxTicks := Ti;
-            FormatSettings.LongTimeFormat := 'hh:nn:ss';
-            Str(Ti: 5, s);
-            if Ti >= 0 then
-            begin
-                AddToMemo(s + 'ms ' + '(' + IntToStr(ResultCount)
-                + ') ' + Begriff + '(' + IntToStr(KeyWordCount)
-                + ')' + ' - ' + IntToStr(Ti3 - Ti2) + '/' + IntToStr
-                (GetTickCount - Ti3) + ' (' + IntToStr(Ti5)
-                + '/' + IntToStr(Ti6) + ')');
-            end;
-
-            SetMaxMemoLines(15);
-            CloseFile(f);
-            ShowQueryStatistics;
-
-            if Ti > 2000 then
-                AppendToLog(IntToStr(Ti) + 'ms   Query=' + Begriff);
-
-            DeleteFile(cSearchTempDir + 'a' + FNam);
-            Code := FindNext(Sr);
-        finally
-            CritSec.Leave;
-        end;
-    end;
-    FindClose(Sr);
-
-    Sleep(10);
-
-    Li.Free;
-end;
-
-
-procedure TForm1.Timer1Timer(Sender: TObject);
-begin
-    Timer1.Enabled := false;
-    if not IdHTTPServer1.Active then IdHTTPServer1.Active := true;
-    // CheckForQueries;
-    Timer1.Enabled := true;
-end;
-*)
-
-
 procedure EmptyCache;
 var
     i: integer;
@@ -1989,12 +1848,42 @@ begin
 end;
 
 
+procedure ShowAdminRoot(Req: TIdHTTPRequestInfo; Res: TIdHTTPResponseInfo);
+var
+  Li: tStringList;
+begin
+  Li := tStringList.Create;
+  Li.Sorted := false;
+  Li.Duplicates := dupAccept;
+
+  Li.Add('<META HTTP-EQUIV="refresh" CONTENT="300">');
+  Li.Add('cSData=' + cSData + '<br>');
+
+  Li.Add('<form action="/admin/shutdown" method="post">');
+  Li.Add('<input type="submit" value="Shutdown"></form><br>');
+
+  Res.ContentText := Li.Text;
+  Li.Free;
+end;
+
+
 procedure tServerObject.IdHTTPServer1CommandGet(AContext: TIdContext;
     ARequestInfo: TIdHTTPRequestInfo;
     AResponseInfo: TIdHTTPResponseInfo);
 begin
+    // WriteLn('Command="',ARequestInfo.Command,'"');
+    // WriteLn('Document="',ARequestInfo.Document,'"');
+
     if AnsiLowerCase(ARequestInfo.Document) = '/query.html' then
-        SetupQuery(ARequestInfo, AResponseInfo);
+        SetupQuery(ARequestInfo, AResponseInfo) else
+
+    if AnsiLowerCase(ARequestInfo.Document) = '/admin/' then
+      ShowAdminRoot(ARequestInfo, AResponseInfo) else
+
+    if (AnsiLowerCase(ARequestInfo.Command) = 'post') and
+      (AnsiLowerCase(ARequestInfo.Document) = '/admin/shutdown') then
+        halt;
+
 end;
 
 
