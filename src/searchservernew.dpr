@@ -46,7 +46,7 @@ const
     // consequences, as the actual memory-allocation is only the amount that
     // is really needed.
 
-    cMaxCachedResults = 64 * 1024 - 1;
+    cMaxCachedResults = 16 * 1024 - 1;
 
 type
     tFilter = array [0 .. cMaxPagesPerShard] of byte;
@@ -125,8 +125,8 @@ var
     b1, b2, b3, b4, b5, b6, b7: integer;
     Searchs: integer;
     NoResults: integer;
-    ValueTable: array [0 .. 65535] of integer;
-    ValueData: array [0 .. 65535, 1 .. 1024] of integer;
+    ValueTable: array [0 .. 65535] of int32;
+    ValueData: array [0 .. 65535, 1 .. 1024] of int32;
     KeyDbs, FancyDbs: array [0 .. 63] of tPreloadedFile;
     BitFieldInitialized: boolean;
     Counter: integer;
@@ -138,6 +138,7 @@ var
     QueryPass: integer;
     EarlyAbort: boolean;
     IdHTTPServer1: TIdHTTPServer;
+    FirstPath, SecondPath: string;
 
 
 
@@ -1479,7 +1480,7 @@ begin
         f.Reset;
 	j := f.FileSize;
 	if j < 4 then j := 4;
-        SetLength(RankData[i], j);
+        SetLength(RankData[i], j div 4);
         f.Read(RankData[i][0], f.FileSize);
         for j := 0 to High(RankData[i]) do
         begin
@@ -1527,25 +1528,25 @@ var
     Ti1: integer;
 begin
     NewPath := '';
-    if FileExists(cSearchFirstPath + 'ready2.dat') and FileExists(cSearchFirstPath + 'keys63.idx') and
-    (not FileExists(cSearchSecondPath + 'ready2.dat')) then NewPath := cSearchFirstPath;
+    if FileExists(FirstPath + 'ready2.dat') and FileExists(FirstPath + 'keys63.idx') and
+    (not FileExists(SecondPath + 'ready2.dat')) then NewPath := FirstPath;
 
-    if FileExists(cSearchSecondPath + 'ready2.dat') and FileExists(cSearchSecondPath + 'keys63.idx') and
-    (not FileExists(cSearchFirstPath + 'ready2.dat')) then NewPath := cSearchSecondPath;
+    if FileExists(SecondPath + 'ready2.dat') and FileExists(SecondPath + 'keys63.idx') and
+    (not FileExists(FirstPath + 'ready2.dat')) then NewPath := SecondPath;
 
-    if FileExists(cSearchFirstPath + 'ready2.dat') and FileExists(cSearchFirstPath + 'keys63.idx') and
-    FileExists(cSearchSecondPath + 'ready2.dat') and FileExists(cSearchSecondPath + 'keys63.idx') then
+    if FileExists(FirstPath + 'ready2.dat') and FileExists(FirstPath + 'keys63.idx') and
+    FileExists(SecondPath + 'ready2.dat') and FileExists(SecondPath + 'keys63.idx') then
     begin
-        i := FindFirst(cSearchFirstPath + 'ready2.dat', faAnyFile, Sr);
+        i := FindFirst(FirstPath + 'ready2.dat', faAnyFile, Sr);
         if i = 0 then
         begin
             Ti1 := Sr.Time;
             FindClose(Sr);
-            i := FindFirst(cSearchSecondPath + 'ready2.dat', faAnyFile, Sr);
+            i := FindFirst(SecondPath + 'ready2.dat', faAnyFile, Sr);
             if i = 0 then
             begin
-                if Ti1 > Sr.Time then NewPath := cSearchFirstPath
-                else NewPath := cSearchSecondPath;
+                if Ti1 > Sr.Time then NewPath := FirstPath
+                else NewPath := SecondPath;
             end;
             FindClose(Sr);
         end
@@ -1837,7 +1838,7 @@ begin
             + '/' + IntToStr(Ti6) + ')');
         end;
 
-        ShowQueryStatistics;
+        // ShowQueryStatistics;
 
         if Ti > 2000 then
             AppendToLog(IntToStr(Ti) + 'ms   Query=' + Begriff);
@@ -1908,12 +1909,33 @@ begin
     while i <= ParamCount do
     begin
         s := LowerCase(ParamStr(i));
+
         if (s = '-p') or (s = '-port') then
         begin
             Inc(i);
             //IdHTTPServer1.DefaultPort := StrToIntDef(ParamStr(i), 8081);
             Binding.Port := StrToIntDef(ParamStr(i), 8081);
+        end
+
+        else if (s = '-path1') or (s='-1') then
+        begin
+            Inc(i);
+            FirstPath := ParamStr(i);
+            if FirstPath = '' then FirstPath := cSearchFirstPath;
+            if copy(FirstPath,1,Length(FirstPath)) <> '\' then
+                FirstPath := FirstPath + '\';
+        end
+
+        else if (s = '-path2') or (s='-2') then
+        begin
+            Inc(i);
+            SecondPath := ParamStr(i);
+            if SecondPath = '' then SecondPath := cSearchSecondPath;
+            if copy(SecondPath,1,Length(SecondPath)) <> '\' then
+                SecondPath := SecondPath + '\';
         end;
+
+
 
         Inc(i);
     end;
@@ -1934,6 +1956,9 @@ end;
 
 begin
     CritSec := tCriticalSection.Create;
+    FirstPath := cSearchFirstPath;
+    SecondPath := cSearchSecondPath;
+
     InitServer;
-    while true do ;
+    while true do Sleep(1000);
 end.
