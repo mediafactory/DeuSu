@@ -73,13 +73,16 @@ const
 {$IFDEF FULLSCALE_VERSION}
   // Size of RWI HashTable for keywords and hostnames
   cMaxIndexHash = 4*1024*1024-1;
+  cCompressedMaxIndexHash = 1024*1024-1;
 
   // Size of the URL hashtable
   cMaxUrlHash = ((256*1024*1024) div cDbCount)-1;
 {$ELSE}
   cMaxIndexHash = 16*1024-1;
+  cCompressedMaxIndexHash = 16*1024-1;
   cMaxUrlHash = ((1024*1024) div cDbCount)-1;
 {$ENDIF}
+
 
 
 
