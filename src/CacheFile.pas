@@ -47,6 +47,7 @@ type
     FFile: TFileStream;
     FFileName: string;
     FSize: int64;
+    FPosition: int64;
 
     procedure FlushBuffer;
   public
@@ -56,6 +57,7 @@ type
     procedure Reset;
     procedure ReWrite;
     procedure Write(var Data; Len: int64);
+    procedure Seek(NewPosition: int64);
   end;
 
   TPreloadedFile = class
@@ -108,6 +110,7 @@ begin
   FFile := TFileStream.Create(FFileName, fmCreate or fmShareDenyNone);
   FBufLen := 0;
   FSize := 0;
+  FPosition := 0;
 end;
 
 
@@ -118,6 +121,7 @@ begin
     fmOpenReadWrite or fmShareDenyNone);
   FBufLen := 0;
   FSize := 0;
+  FPosition := 0;
 end;
 
 
@@ -155,7 +159,8 @@ begin
   else
     FFile.Write(Data, Len);
 
-  Inc(FSize, Len);
+  Inc(FPosition, Len);
+  if FPosition > FSize then FSize := FPosition;
 end;
 
 
@@ -163,6 +168,15 @@ end;
 function TBufWriteFile.FileSize:int64;
 begin
   Result := FSize;
+end;
+
+
+
+procedure TBufWriteFile.Seek(NewPosition: int64);
+begin
+  FlushBuffer;
+  FPosition := 0;
+  FFile.Position := FPosition;
 end;
 
 
