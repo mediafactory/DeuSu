@@ -155,36 +155,6 @@ end;
 
 
 
-function ReferenceRAMCaches: integer;
-// Accesses internal RAM-Caches. This is done to prevent the OS from
-// swapping-out the caches. This could happen if there are relatively
-// few searches being done.
-var
-    i, j: integer;
-    Sum: int64;
-begin
-    Sum := 0;
-    for i := 0 to cDbCount - 1 do
-    begin
-        for j := 0 to FilterDataSize[i] - 1 do
-            Inc(Sum, FilterData[i]^[j]);
-
-        for j := 0 to High(RankData[i]) do
-            Inc(Sum, RankData[i][j]);
-
-        for j := 0 to High(UrlData[i]) do
-            Inc(Sum, UrlData[i][j]);
-
-        for j := 0 to High(BackLinkData[i]) do
-            Inc(Sum, BackLinkData[i][j]);
-    end;
-
-    // We need to do something with "Sum" in order to prevent
-    // the compiler warning "Value assigned to Sum never used".
-    Result := Sum;
-end;
-
-
 function GetBackLinkValue(DbNr, Index: int32): double;
 var
     BackLinkCount: int64;
@@ -1152,29 +1122,6 @@ begin
 end;
 
 
-function GetURLbyDocumentID(DocID: integer): shortstring;
-var
-    DbNr, Posi: integer;
-    Url: shortstring;
-begin
-    DbNr := DocID and (cDbCount - 1);
-    Posi := (DocID shr cDbBits) * 378;
-    Html[DbNr].Position := Posi;
-    Html[DbNr].Read(Url, 61);
-    Result := Url;
-end;
-
-
-procedure SwapInt(var i1, i2: integer);
-var
-    i: integer;
-begin
-    i := i1;
-    i1 := i2;
-    i2 := i;
-end;
-
-
 procedure GenResults(Li: tStringList);
 var
     Nr: integer;
@@ -1591,52 +1538,6 @@ begin
 end;
 
 
-procedure ShowQueryStatistics;
-var
-    s: string;
-begin
-    exit;
-
-    WriteLn('Stats: ', Searchs, ' of which ', NoResults, ' are without result');
-    WriteLn('Stats: ', 0.001 * Ticks / Searchs: 5: 3, 'ms/query');
-    WriteLn('Stats: ', 0.001 * MaxTicks: 5: 3, 'ms max/query');
-    WriteLn('Stats: ', 0.001 * MinTicks: 5: 3, 'ms min/query');
-    WriteLn('Stats: ', Counter, ' queries (', 100 * Counter div Searchs, '% cache-hits)');
-end;
-
-
-procedure HandleCacheRefresh;
-var
-    Ti: dword;
-begin
-    Inc(RefreshCachesCountdown);
-    if RefreshCachesCountdown >= 4000 then
-    begin
-        Ti := GetTickCount;
-        ReferenceRAMCaches;
-        // WriteLn('RAM-Caches refreshed ', GetTickCount-Ti, 'ms');
-        RefreshCachesCountdown := 0;
-    end;
-end;
-
-
-function ParseParameter(Parameter: string; Default, Min, Max: integer): integer;
-var
-    Value: integer;
-begin
-    if not TryStrToInt(FindParam(Parameter), Value) then
-        Value := Default;
-
-    if Value < Min then
-        Value := Min;
-
-    if Value > Max then
-        Value := Max;
-
-    Result := Value;
-end;
-
-
 function ParseThisParameter(s: string; Default, Min, Max: integer): integer;
 var
     Value: integer;
@@ -1655,37 +1556,6 @@ begin
         Value := Max;
 
     Result := Value;
-end;
-
-
-procedure ProcessQueryParameters;
-begin
-    b1 := ParseParameter('b1', 8, 0, 32) * 256;
-    b2 := ParseParameter('b2', 2, 0, 32) * 256;
-    b3 := ParseParameter('b3', 2, 0, 32) * 256;
-    b4 := ParseParameter('b4', 1, 0, 32) * 256;
-    b5 := ParseParameter('b5', 1, 0, 32) * 256;
-    b6 := ParseParameter('b6', 1, 0, 32) * 256;
-
-    b7 := ParseParameter('b7', 1, 0, 32 * 256);
-    // yes, for b7 it's really "32*256" and not "32)*256"
-
-    // if all ranking parameters have NO weight, then give at least b1 some
-    if (b1 = 0) and (b2 = 0) and (b3 = 0) and (b4 = 0) and (b5 = 0) and
-    (b6 = 0) and (b7 = 0) then
-        b1 := 256;
-
-    FilterMask := 0;
-    Begriff := FindParam('begriff');
-    StartWithNr := ParseParameter('startwith', 1, 1, 201);
-    ShowCount := 10;
-    PreferDe := FindParam('preferde') <> '';
-    PreferEn := FindParam('preferen') <> '';
-    GerOnly := FindParam('geronly') <> '';
-    if GerOnly then
-        FilterMask := FilterMask or 32;
-    ExtractKeywords;
-    RefineSearch;
 end;
 
 
