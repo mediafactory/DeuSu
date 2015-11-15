@@ -228,6 +228,7 @@ end;
 
 procedure AddToMemo(Txt: string);
 begin
+    exit;
     WriteLn(Txt);
 end;
 
@@ -1594,6 +1595,8 @@ procedure ShowQueryStatistics;
 var
     s: string;
 begin
+    exit;
+
     WriteLn('Stats: ', Searchs, ' of which ', NoResults, ' are without result');
     WriteLn('Stats: ', 0.001 * Ticks / Searchs: 5: 3, 'ms/query');
     WriteLn('Stats: ', 0.001 * MaxTicks: 5: 3, 'ms max/query');
@@ -1611,7 +1614,7 @@ begin
     begin
         Ti := GetTickCount;
         ReferenceRAMCaches;
-        WriteLn('RAM-Caches refreshed ', GetTickCount-Ti, 'ms');
+        // WriteLn('RAM-Caches refreshed ', GetTickCount-Ti, 'ms');
         RefreshCachesCountdown := 0;
     end;
 end;
@@ -1852,13 +1855,41 @@ end;
 procedure ShowAdminRoot(Req: TIdHTTPRequestInfo; Res: TIdHTTPResponseInfo);
 var
   Li: tStringList;
+  s: string;
 begin
   Li := tStringList.Create;
   Li.Sorted := false;
   Li.Duplicates := dupAccept;
 
   Li.Add('<META HTTP-EQUIV="refresh" CONTENT="300">');
-  Li.Add('cSData=' + cSData + '<br>');
+  Li.Add('<body><style>');
+  Li.Add('body {');
+  Li.Add('font-size: 12px;');
+  Li.Add('}');
+  Li.Add('</style>');
+  Li.Add(cSData + '<br>');
+
+  Li.Add(IntToStr(Searchs)+' of which ' + IntToStr(NoResults) + ' are without result<br/>');
+
+  if Searchs>0 then
+  begin
+    Str(Ticks / Searchs: 5: 3, s);
+    Li.Add(s + 'ms/query<br/>');
+  end;
+
+  Str(MaxTicks: 5, s);
+  Li.Add(s + 'ms max-query<br/>');
+
+  Str(MinTicks: 5, s);
+  Li.Add(s + 'ms min-query<br/>');
+
+  (*
+    WriteLn('Stats: ', Searchs, ' of which ', NoResults, ' are without result');
+    WriteLn('Stats: ', 0.001 * Ticks / Searchs: 5: 3, 'ms/query');
+    WriteLn('Stats: ', 0.001 * MaxTicks: 5: 3, 'ms max/query');
+    WriteLn('Stats: ', 0.001 * MinTicks: 5: 3, 'ms min/query');
+    WriteLn('Stats: ', Counter, ' queries (', 100 * Counter div Searchs, '% cache-hits)');
+  *)
 
   Li.Add('<form action="/admin/shutdown" method="post">');
   Li.Add('<input type="submit" value="Shutdown"></form><br>');
