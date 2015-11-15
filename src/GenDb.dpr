@@ -21,13 +21,14 @@ uses
     SysUtils,
     OSWrapper,
     Classes,
-    CacheFile in 'CacheFile.pas',
-    DbTypes in 'DbTypes.pas',
-    Hash in 'Hash.pas',
-    FileLocation in 'FileLocation.pas',
-    GlobalTypes in 'GlobalTypes.pas',
-    DomainRank in 'DomainRank.pas',
-    UrlDatabase in 'UrlDatabase.pas';
+    CacheFile,
+    DbTypes,
+    Hash,
+    FileLocation,
+    GlobalTypes,
+    DomainRank,
+    UrlDatabase,
+    rwi;
 
 type
     TProgress = record
