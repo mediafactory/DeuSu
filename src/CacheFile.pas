@@ -318,7 +318,7 @@ begin
     FFile.Free;
   end;
 
-  FFile := TFileStream.Create(FFileName, Mode, fmShareDenyNone);
+  FFile := TFileStream.Create(FFileName, Mode or fmShareDenyNone);
 end;
 
 
