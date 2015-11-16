@@ -32,6 +32,7 @@ uses
     GlobalTypes,
     FileLocation,
     DbTypes,
+    rwi,
     SyncObjs,
     Words;
 
@@ -46,7 +47,7 @@ const
     // consequences, as the actual memory-allocation is only the amount that
     // is really needed.
 
-    cMaxCachedResults = 16 * 1024 - 1;
+    cMaxCachedResults = 2 * 1024 - 1;
 
 type
     tFilter = array [0 .. cMaxPagesPerShard] of byte;
@@ -81,6 +82,10 @@ type
 		AContext: TIdContext;
 		ARequestInfo: TIdHTTPRequestInfo;
 		AResponseInfo: TIdHTTPResponseInfo);
+    end;
+
+    tFeatureFlags = record
+        EnableCompressedIndex: boolean;
     end;
 
 
@@ -127,7 +132,7 @@ var
     NoResults: integer;
     ValueTable: array [0 .. 65535] of int32;
     ValueData: array [0 .. 65535, 1 .. 1024] of int32;
-    KeyDbs, FancyDbs: array [0 .. 63] of tPreloadedFile;
+    KeyDbs, FancyDbs: array [0 .. 63] of tCacheFile;
     BitFieldInitialized: boolean;
     Counter: integer;
     Count: integer;
@@ -139,6 +144,7 @@ var
     EarlyAbort: boolean;
     IdHTTPServer1: TIdHTTPServer;
     FirstPath, SecondPath: string;
+    FeatureFlags: tFeatureFlags;
 
 
 
@@ -561,11 +567,14 @@ end;
 
 function FindKeyWordResultCount(ThisKey: shortstring; KeywordNr: integer): integer;
 var
-    Keys: ^tPreloadedFile;
+    Keys: ^tCacheFile;
     HashCode: integer;
     s: shortstring;
     Po: int64;
+    Po32: uint32;
     An: int32;
+    TopHitsPointer: int64;
+    THP32: int32;
 begin
     Result := 0;
 
@@ -598,12 +607,29 @@ begin
     Str(HashCode and 63, s);
     Keys := @KeyDbs[HashCode and 63];
     // AppendToLog('Optimizer: Searching for keyword "' + ThisKey + '" in database #' + IntToStr(HashCode and 63));
-    HashCode := (HashCode shr 6) and cMaxIndexHash;
+
+
+    if FeatureFlags.EnableCompressedIndex then
+        HashCode := (HashCode shr 6) and cCompressedMaxIndexHash
+    else
+        HashCode := (HashCode shr 6) and cMaxIndexHash;
+
+
     if Length(s) < 2 then s := '0' + s;
     FileMode := 0;
 
-    Keys.Seek(HashCode * 8);
-    Keys.Read(Po, 8);
+    if FeatureFlags.EnableCompressedIndex then
+    begin
+        Keys.Seek(HashCode * 4);
+        Keys.Read(Po32, 4);
+        Po := Po32;
+    end
+    else
+    begin
+        Keys.Seek(HashCode * 8);
+        Keys.Read(Po, 8);
+    end;
+
     Keys.Seek(Po);
 
     while Po <> 0 do
@@ -614,14 +640,30 @@ begin
             break;
         end;
         Keys.Read(s[1], Length(s));
+        Keys.Read(An, 4);
+
+        if FeatureFlags.EnableCompressedIndex then
+        begin
+            Keys.Read(THP32, 4);
+            TopHitsPointer := THP32;
+        end
+        else
+            Keys.Read(TopHitsPointer, SizeOf(TopHitsPointer));
+
+        if FeatureFlags.EnableCompressedIndex then Keys.Read(Po32, 4);
+
         if s = ThisKey then
         begin
-            Keys.Read(An, 4);
             Result := An;
             exit;
         end;
-        Keys.Read(An, 4);
-        Keys.Seek(Keys.FilePos + uint32(An) * 4 + 8);
+
+        if FeatureFlags.EnableCompressedIndex then
+        begin
+            if Po32 = 0 then break;
+            Keys.Seek(Po32)
+        end
+        else Keys.Seek(Keys.FilePos + uint32(An) * 4);
     end;
 
     Result := 0;
@@ -645,11 +687,13 @@ end;
 
 procedure FindThisKey(ThisKey: shortstring; Action: tAction);
 var
-    Keys, Fancy: ^tPreloadedFile;
+    Keys, Fancy: ^tCacheFile;
+    UseFancyHits: boolean;
     HashCode: integer;
     s: shortstring;
     An: int32;
     Po: int64;
+    Po32: uint32;
     i, An2, ThisAn: integer;
     ThisValue, NewValue: integer;
     DbNr, Index: integer;
@@ -663,6 +707,7 @@ var
     ThisUrlData: byte;
     PathElements, HostElements: byte;
     TopHitsPointer: int64;
+    THP32, PreviousDocumentID: int32;
 begin
     Ti4 := GetTickCount;
     Ti5 := 0;
@@ -738,13 +783,30 @@ begin
     Str(HashCode and 63, s);
     Keys := @KeyDbs[HashCode and 63];
     Fancy := @FancyDbs[HashCode and 63];
-    HashCode := (HashCode shr 6) and cMaxIndexHash;
+
+    if FeatureFlags.EnableCompressedIndex then
+        HashCode := (HashCode shr 6) and cCompressedMaxIndexHash
+    else
+        HashCode := (HashCode shr 6) and cMaxIndexHash;
+
+
     if Length(s) < 2 then s := '0' + s;
     FileMode := 0;
 
-    Keys.Seek(HashCode * 8);
-    Keys.Read(Po, 8);
+    if FeatureFlags.EnableCompressedIndex then
+    begin
+        Keys.Seek(HashCode * 4);
+        Keys.Read(Po32, 4);
+        Po := Po32;
+    end
+    else
+    begin
+        Keys.Seek(HashCode * 8);
+        Keys.Read(Po, 8);
+    end;
     Keys.Seek(Po);
+
+    PreviousDocumentID := 0;
 
     while Po <> 0 do
     begin
@@ -758,12 +820,23 @@ begin
             exit;
         end;
         Keys.Read(s[1], Length(s));
-        if s = ThisKey then
+        Keys.Read(An, 4);
+
+        if FeatureFlags.EnableCompressedIndex then
         begin
-            Keys.Read(An, 4);
+            Keys.Read(THP32, 4);
+            TopHitsPointer := THP32;
+        end
+        else
             Keys.Read(TopHitsPointer, SizeOf(TopHitsPointer));
 
-            if (QueryPass = 1) and (TopHitsPointer <> -1) then
+        if FeatureFlags.EnableCompressedIndex then
+            Keys.Read(Po32, 4);
+
+        if s = ThisKey then
+        begin
+            UseFancyHits := (QueryPass = 1) and (TopHitsPointer <> -1);
+            if UseFancyHits then
             begin
                 Fancy.Seek(TopHitsPointer);
                 Fancy.Read(An, 4);
@@ -786,10 +859,27 @@ begin
             begin
                 ThisAn := An;
                 if ThisAn > cMaxTempPages then ThisAn := cMaxTempPages;
-                if (QueryPass = 2) or (TopHitsPointer = -1) then
-                    Keys.Read(TempBuf, 4 * ThisAn)
-                else
+
+                if UseFancyHits then
+                begin
                     Fancy.Read(TempBuf, 4 * ThisAn);
+                end
+                else
+                begin
+                    if FeatureFlags.EnableCompressedIndex then
+                    begin
+                        for i := 1 to ThisAn do
+                        begin
+                            TempBuf[i] := ReadCompressedDocumentID(
+                                Keys^, PreviousDocumentID);
+                            PreviousDocumentID := TempBuf[i] shr 3;
+                        end;
+                    end
+                    else
+                    begin
+                        Keys.Read(TempBuf, 4 * ThisAn);
+                    end;
+                end;
 
 
                 if (Action = acAnd) and AllLocations and (FilterMask = 0) then ProcessThisKeyViaAnd(ThisAn)
@@ -911,9 +1001,21 @@ begin
             Ti6 := GetTickCount - Ti5 - Ti4;
             exit;
         end;
-        Keys.Read(An, 4);
-        Keys.Read(TopHitsPointer, SizeOf(TopHitsPointer));
-        Keys.Seek(Keys.FilePos + uint32(An) * 4);
+
+        if FeatureFlags.EnableCompressedIndex then
+        begin
+            if Po32 = 0 then
+            begin
+                if Action = acAnd then
+                    for i := 0 to cDbCount - 1 do
+                        FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
+                Ti6 := GetTickCount - Ti5 - Ti4;
+                exit;
+            end;
+            Keys.Seek(Po32);
+        end
+        else
+            Keys.Seek(Keys.FilePos + uint32(An) * 4);
     end;
 
     if Action = acAnd then
@@ -1378,22 +1480,64 @@ var
     f: tCacheFile;
     i, j: integer;
     NonMinusOne: integer;
+    f2: TextFile;
+    Key, Value, s: string;
+    IndexExtension: string;
 begin
+    FeatureFlags.EnableCompressedIndex := false;
+
+    try
+        AssignFile(f2, cSData + 'features.cfg');
+        Reset(f2);
+
+        while not eof(f2) do
+        begin
+            ReadLn(f2, s);
+            i := Pos('=', s);
+            if i > 0 then
+            begin
+                Key := LowerCase(Trim(  copy(s, 1, i-1) ));
+
+                Delete(s, 1, i);
+                Value := LowerCase( Trim(s) );
+
+                if (Key = 'enablecompressedindex') and
+                    ((Value = 'true') or (Value = 'yes')) then
+                begin
+                    FeatureFlags.EnableCompressedIndex := true;
+                    WriteLn('EnableCompressedIndex=true');
+                end;
+            end;
+        end;
+
+        CloseFile(f2);
+    except
+    end;
+
+
+
+    if FeatureFlags.EnableCompressedIndex then
+        IndexExtension := '.cidx'
+    else
+        IndexExtension := '.idx';
+
+
+
     for i := 0 to 63 do
     begin
-        KeyDbs[i] := tPreloadedFile.Create;
+        KeyDbs[i] := tCacheFile.Create;
         if i < 10 then
-            KeyDbs[i].Assign(cSData + 'keys0' + IntToStr(i) + '.idx')
+            KeyDbs[i].Assign(cSData + 'keys0' + IntToStr(i) + IndexExtension)
         else
-            KeyDbs[i].Assign(cSData + 'keys' + IntToStr(i) + '.idx');
-        KeyDbs[i].OpenRead;
+            KeyDbs[i].Assign(cSData + 'keys' + IntToStr(i) + IndexExtension);
+        KeyDbs[i].Reset;
 
-        FancyDbs[i] := tPreloadedFile.Create;
+        FancyDbs[i] := tCacheFile.Create;
         if i < 10 then
             FancyDbs[i].Assign(cSData + 'fancy0' + IntToStr(i) + '.idx')
         else
             FancyDbs[i].Assign(cSData + 'fancy' + IntToStr(i) + '.idx');
-        FancyDbs[i].OpenRead;
+        FancyDbs[i].Reset;
     end;
 
     NonMinusOne := 0;
@@ -1476,14 +1620,14 @@ var
     Ti1: integer;
 begin
     NewPath := '';
-    if FileExists(FirstPath + 'ready2.dat') and FileExists(FirstPath + 'keys63.idx') and
+    if FileExists(FirstPath + 'ready2.dat') and
     (not FileExists(SecondPath + 'ready2.dat')) then NewPath := FirstPath;
 
-    if FileExists(SecondPath + 'ready2.dat') and FileExists(SecondPath + 'keys63.idx') and
+    if FileExists(SecondPath + 'ready2.dat') and
     (not FileExists(FirstPath + 'ready2.dat')) then NewPath := SecondPath;
 
-    if FileExists(FirstPath + 'ready2.dat') and FileExists(FirstPath + 'keys63.idx') and
-    FileExists(SecondPath + 'ready2.dat') and FileExists(SecondPath + 'keys63.idx') then
+    if FileExists(FirstPath + 'ready2.dat') and
+    FileExists(SecondPath + 'ready2.dat') then
     begin
         i := FindFirst(FirstPath + 'ready2.dat', faAnyFile, Sr);
         if i = 0 then
@@ -1752,14 +1896,6 @@ begin
 
   Str(MinTicks: 5, s);
   Li.Add(s + 'ms min-query<br/>');
-
-  (*
-    WriteLn('Stats: ', Searchs, ' of which ', NoResults, ' are without result');
-    WriteLn('Stats: ', 0.001 * Ticks / Searchs: 5: 3, 'ms/query');
-    WriteLn('Stats: ', 0.001 * MaxTicks: 5: 3, 'ms max/query');
-    WriteLn('Stats: ', 0.001 * MinTicks: 5: 3, 'ms min/query');
-    WriteLn('Stats: ', Counter, ' queries (', 100 * Counter div Searchs, '% cache-hits)');
-  *)
 
   Li.Add('<form action="/admin/shutdown" method="post">');
   Li.Add('<input type="submit" value="Shutdown"></form><br>');
