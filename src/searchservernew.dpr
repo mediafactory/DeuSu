@@ -33,6 +33,7 @@ uses
     FileLocation,
     DbTypes,
     rwi,
+    math,
     SyncObjs,
     Words;
 
@@ -66,7 +67,7 @@ type
     end;
 
     tRankDataArray = array of int32;
-    tBackLinkDataArray = array of int64;
+    tBackLinkDataArray = array of int32;
     tUrlDataArray = array of byte;
 
     tRWIWorkChunk = record
@@ -145,6 +146,8 @@ var
     IdHTTPServer1: TIdHTTPServer;
     FirstPath, SecondPath: string;
     FeatureFlags: tFeatureFlags;
+    CorpusSize: int64;
+    InverseDocumentFrequency: double;
 
 
 
@@ -168,6 +171,7 @@ begin
     BackLinkCount := BackLinkData[DbNr][Index];
     if (BackLinkCount = 0) or (MaxBackLinkCount <= 1) then Result := 1.0
     else Result := 2500.0 * ln(BackLinkCount) / ln(MaxBackLinkCount);
+    //else Result := 1000000.0 * (1.0 + ln(BackLinkCount));
 end;
 
 
@@ -537,10 +541,12 @@ begin
             ThisRankValue := LookupDomainRank((Index shl cDbBits) or DbNr) + 1;
             ThisUrlData := LookupUrlData((Index shl cDbBits) or DbNr) + 1;
             HostElements := ThisUrlData and 15;
+            // HostElements := 1;
 
             if ThisRankValue = 0 then ThisRankValue := 1000001;
 
-            ThisValue := Round((1.0 - ThisRankValue * 0.000000027) * ThisValue / HostElements);
+            ThisValue := Round((1.0 - ThisRankValue * 0.000000027) *
+                ThisValue / HostElements * InverseDocumentFrequency);
 
 
 
@@ -924,12 +930,15 @@ begin
                                 ThisRankValue := LookupDomainRank((Index shl cDbBits) or DbNr) + 1;
                                 ThisUrlData := LookupUrlData((Index shl cDbBits) or DbNr) + 1;
                                 HostElements := ThisUrlData and 15;
+                                // HostElements := 1;
 
                                 if ThisRankValue = 0 then ThisRankValue := 1000001;
 
                                 Inc(ThisValue, Round(GetBackLinkValue(DbNr, Index)));
                                 ThisValue :=
-                                Round((1.0 - ThisRankValue * 0.000000027) * ThisValue / HostElements);
+                                    Round((1.0 - ThisRankValue * 0.000000027) *
+                                        ThisValue / HostElements *
+                                        InverseDocumentFrequency);
 
 
 
@@ -1159,6 +1168,15 @@ begin
 
     for i := 1 to KeyWordCount do
     begin
+        try
+            InverseDocumentFrequency :=
+                log10( 11.0 +
+                     (CorpusSize + KeyWordResultCount[i] + 0.5) /
+                     (KeyWordResultCount[i] + 0.5) );
+        except
+            InverseDocumentFrequency := 1.0;
+        end;
+
         ThisKey := KeyWords[i];
         Method := logAnd;
         if ThisKey <> '' then
@@ -1235,6 +1253,7 @@ var
     BitFieldPtr: pBitField;
     ValuesPtr: pValues;
     f: TextFile;
+    s: string;
 begin
     if BitFieldInitialized then
     begin
@@ -1356,6 +1375,15 @@ begin
     ResultCount := Count;
     Nr := 0;
 
+    Li.Add('corpussize=' + IntToStr(CorpusSize));
+    for i := 1 to KeyWordCount do
+    begin
+        Li.Add('keyword=' + KeyWords[i]);
+        Li.Add('keywordoccurences=' + IntToStr(KeyWordResultCount[i]));
+        Str(log10( 11.0 + (CorpusSize + KeyWordResultCount[i] + 0.5) /
+                     (KeyWordResultCount[i] + 0.5) ):8:6,s);
+        Li.Add('idf=' + s);
+    end;
 
     Li.Add('TotalCount=' + IntToStr(Count));
     if (Count = 0) and (QueryPass = 2) then
@@ -1483,6 +1511,7 @@ var
     f2: TextFile;
     Key, Value, s: string;
     IndexExtension: string;
+    BackLinkTemp: array of int64;
 begin
     FeatureFlags.EnableCompressedIndex := false;
 
@@ -1542,6 +1571,8 @@ begin
 
     NonMinusOne := 0;
     MaxBackLinkCount := 0;
+    CorpusSize := 0;
+
     for i := 0 to cDbCount - 1 do
     begin
         f := tCacheFile.Create;
@@ -1552,6 +1583,8 @@ begin
             FilterDataSize[i] := 8;
         GetMem(FilterData[i], FilterDataSize[i]);
         f.Read(FilterData[i]^, f.FileSize);
+
+        Inc(CorpusSize, FilterDataSize[i]);
 
         ValueSize[i] := f.FileSize;
         if ValueSize[i] < 8 then
@@ -1600,11 +1633,18 @@ begin
 	j := f.FileSize;
 	if j < 8 then j := 8;
         SetLength(BackLinkData[i], j div 8);
-        f.Read(BackLinkData[i][0], f.FileSize);
+        SetLength(BackLinkTemp, j div 8);
+        f.Read(BackLinkTemp[0], f.FileSize);
         for j := 0 to High(BackLinkData[i]) do
         begin
+            if BackLinkTemp[j] > 2147483647 then
+                BackLinkData[i][j] := 2147483647
+            else
+                BackLinkData[i][j] := BackLinkTemp[j];
+
             if BackLinkData[i][j] > MaxBackLinkCount then MaxBackLinkCount := BackLinkData[i][j];
         end;
+        SetLength(BackLinkTemp,0);
         f.Close;
         f.Free;
 
