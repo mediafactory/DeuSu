@@ -1,28 +1,12 @@
-#### About the "code-cleanup" branch:
-
-This branch is an ongoing process to cleanup the codebase.
-
-This software evolved over more than 15 years and you will notice very
-different coding-styles between old and new parts of the code.
-
-I'm trying to cleanup this mess file-by-file to bring everything to
-the same level. This work began in late April 2015 and will probably
-take about 2-3 months. But given how much guesswork time-estimates are
-in software-development, it may take longer...
-
-**There is no guarantee that this branch will work during that time!!**
-**Use the master-branch instead if you want to be sure that it works.**
-
-
 ### DeuSu
 
 This is a web search-engine that can easily hold a few hundred million web-pages
 in its search-index. If you want to see what it can do, see
 https://deusu.org/
 
-The above website runs on an Intel i7-3770K with 32gb RAM and two 500gb SSDs.
-The search-index on that site currently holds about 327 million WWW-pages.
-On average a query takes about 0.6 seconds. The transfer-speed from SSD into
+The above website runs on an Intel E3-1225 with 32gb RAM and two 500gb SSDs.
+The search-index on that site currently holds about 1.08 billion WWW-pages.
+On average a query takes about 0.2 seconds. The transfer-speed from SSD into
 RAM is the limiting-factor for query-time. Even 600mb/s can be slow sometimes. :)
 
 The software was originally written in Delphi (=Pascal). The latest Delphi
@@ -62,3 +46,22 @@ for how to do that.
 In both cases you will probably have to adjust some compiler-options
 in the the .bat/.sh file to let FPC know about the path to its libraries.
 Somehow the default FPC install never set the paths correctly for me.
+
+#### About the "code-cleanup" branch:
+
+This branch is an ongoing process to cleanup the codebase.
+
+This software evolved over more than 15 years and you will notice very
+different coding-styles between old and new parts of the code.
+
+I'm trying to cleanup this mess file-by-file to bring everything to
+the same level. This work began in late April 2015 and will probably
+take about 2-3 months. But given how much guesswork time-estimates are
+in software-development, it may take longer...
+
+[As of November 2015 this is still ongoing work]
+
+**There is no guarantee that this branch will work during that time!!**
+**Use the master-branch instead if you want to be sure that it works.**
+
+
