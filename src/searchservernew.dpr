@@ -89,6 +89,7 @@ type
         EnableCompressedIndex: boolean;
     end;
 
+    tValueArray = array of int32;
 
 
 var
@@ -132,7 +133,7 @@ var
     Searchs: integer;
     NoResults: integer;
     ValueTable: array [0 .. 65535] of int32;
-    ValueData: array [0 .. 65535, 1 .. 1024] of int32;
+    //ValueData: array [0 .. 65535, 1 .. 1024] of int32;
     KeyDbs, FancyDbs: array [0 .. 63] of tCacheFile;
     BitFieldInitialized: boolean;
     Counter: integer;
@@ -148,6 +149,56 @@ var
     FeatureFlags: tFeatureFlags;
     CorpusSize: int64;
     InverseDocumentFrequency: double;
+    NewValueData: array[0..65535] of tValueArray;
+
+
+
+
+procedure ResizeValueArray(Value, MinSize: int32);
+var
+    CurrentSize: int32;
+    NewSize: int32;
+begin
+    CurrentSize := Length(NewValueData[Value]);
+    NewSize := CurrentSize + 10;
+    if NewSize > 1024 then NewSize := 1024;
+    SetLength(NewValueData[Value], NewSize);
+end;
+
+
+
+procedure SetValueData(Value, Index, DocId: int32);
+begin
+    Dec(Index);
+    if Index > High(NewValueData[Value]) then
+        ResizeValueArray(Value, Index+1);
+
+    NewValueData[Value][Index] := DocId;
+end;
+
+
+
+function GetValueData(Value, Index: int32):int32;
+begin
+    Dec(Index);
+    if Index > High(NewValueData[Value]) then
+        ResizeValueArray(Value, Index+1);
+
+    Result := NewValueData[Value][Index];
+end;
+
+
+
+procedure InitValueArray;
+var
+    i: int32;
+begin
+    for i := 0 to 65535 do
+    begin
+        SetLength(NewValueData[i], 10);
+    end;
+end;
+
 
 
 
@@ -960,8 +1011,10 @@ begin
                                             Inc(ValueTable[ThisValue]);
                                             if ValueTable[ThisValue] <= 1024 then
                                             begin
-                                                ValueData[ThisValue, ValueTable[ThisValue]] :=
-                                                (Index shl cDbBits) or DbNr;
+                                                //ValueData[ThisValue, ValueTable[ThisValue]] :=
+                                                //    (Index shl cDbBits) or DbNr;
+                                                SetValueData(ThisValue, ValueTable[ThisValue],
+                                                    (Index shl cDbBits) or DbNr);
                                             end;
                                         end;
                                     end;
@@ -1149,7 +1202,8 @@ begin
             begin
                 ThisValue := CachedResults[HashCode].Values[i];
                 Inc(ValueTable[ThisValue]);
-                ValueData[ThisValue, ValueTable[ThisValue]] := CachedResults[HashCode].Pages[i];
+                //ValueData[ThisValue, ValueTable[ThisValue]] := CachedResults[HashCode].Pages[i];
+                SetValueData(ThisValue, ValueTable[ThisValue], CachedResults[HashCode].Pages[i]);
             end;
             exit;
         end;
@@ -1283,7 +1337,9 @@ begin
                                 if ThisValue > MaxValue then MaxValue := ThisValue;
                                 Inc(ValueTable[ThisValue]);
                                 if ValueTable[ThisValue] <= 1001 then
-                                    ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
+                                    //ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
+                                    SetValueData(ThisValue, ValueTable[ThisValue],
+                                        ((i32) shl cDbBits) or DbNr);
                             end;
                             Data := Data shr 1;
                             Inc(i32);
@@ -1308,7 +1364,9 @@ begin
                                 if ThisValue > MaxValue then MaxValue := ThisValue;
                                 Inc(ValueTable[ThisValue]);
                                 if ValueTable[ThisValue] <= 1001 then
-                                    ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
+                                    //ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
+                                    SetValueData(ThisValue, ValueTable[ThisValue],
+                                        ((i32) shl cDbBits) or DbNr);
                             end;
                             Data := Data shr 1;
                             Inc(i32);
@@ -1333,7 +1391,9 @@ begin
                                 if ThisValue > MaxValue then MaxValue := ThisValue;
                                 Inc(ValueTable[ThisValue]);
                                 if ValueTable[ThisValue] <= 1001 then
-                                    ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
+                                    //ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
+                                    SetValueData(ThisValue, ValueTable[ThisValue],
+                                        ((i32) shl cDbBits) or DbNr);
                             end;
                             Data := Data shr 1;
                             Inc(i32);
@@ -1358,7 +1418,9 @@ begin
                                 if ThisValue > MaxValue then MaxValue := ThisValue;
                                 Inc(ValueTable[ThisValue]);
                                 if ValueTable[ThisValue] <= 1001 then
-                                    ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
+                                    //ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
+                                    SetValueData(ThisValue, ValueTable[ThisValue],
+                                        ((i32) shl cDbBits) or DbNr);
                             end;
                             Data := Data shr 1;
                             Inc(i32);
@@ -1415,7 +1477,8 @@ begin
             Inc(Nr);
             if (Nr >= StartWithNr) and (Nr <= EndWithNr) then
             begin
-                j := ValueData[ThisValue, i];
+                //j := ValueData[ThisValue, i];
+                j := GetValueData(ThisValue, i);
                 if (QueryPass = 2) or (ResultCount >= 1000) then ShowLink(j, ThisValue, Nr, Li);
             end; { Show this link }
             if Nr >= EndWithNr then break;
@@ -1438,7 +1501,8 @@ begin
                 for i := 1 to ValueTable[ThisValue] do
                 begin
                     Inc(Nr);
-                    CachedResults[HashCode].Pages[Nr] := ValueData[ThisValue, i];
+                    //CachedResults[HashCode].Pages[Nr] := ValueData[ThisValue, i];
+                    CachedResults[HashCode].Pages[Nr] := GetValueData(ThisValue, i);
                     CachedResults[HashCode].Values[Nr] := ThisValue;
                     if Nr >= 1000 then break;
                 end;
@@ -1971,6 +2035,8 @@ var
     s: string;
     Binding: TIdSocketHandle;
 begin
+    InitValueArray;
+
     ServerObject := tServerObject.Create;
 
     IdHTTPServer1:=TIdHTTPServer.Create;
