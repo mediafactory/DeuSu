@@ -1,6 +1,6 @@
 ### DeuSu
 
-This is a web search-engine that can easily hold a few hundred million web-pages
+This is a web search-engine that can easily hold a billion web-pages
 in its search-index. If you want to see what it can do, see
 https://deusu.org/
 
