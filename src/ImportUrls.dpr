@@ -272,6 +272,7 @@ var
     LastPreloadDbNr: integer;
     DoPreload: boolean;
     DoRoundRobin: boolean;
+    DoClearDb: boolean;
     RRFile: TextFile;
     StartDbNr, EndDbNr: integer;
     StartTi, CurrentTi: int64;
@@ -292,14 +293,16 @@ begin
     DoPreload := false;
     MaxRuntime := 15 * 60; // The default for MaxRuntime is 15 minutes
     TimeStampInsteadOfBacklinks := false;
+    DoClearDb := false;
 
     i := 1;
     while i <= ParamCount do
     begin
         s := LowerCase(ParamStr(i));
 
-        if (s = '-r') or (s = '-timestampinsteadofbacklinks') then TimeStampInsteadOfBacklinks := true;
+        if (s = '-t') or (s = '-timestampinsteadofbacklinks') then TimeStampInsteadOfBacklinks := true;
         if (s = '-r') or (s = '-roundrobin') then DoRoundRobin := true;
+        if (s = '-c') or (s = '-cleardb') then DoClearDb := true;
         if (s = '-p') or (s = '-preload') then DoPreload := true;
 
         if (s = '-s') or (s = '-startdb') then
@@ -339,12 +342,83 @@ begin
 end;
 
 
+
+procedure ClearDbNr(DbNr: integer);
+var
+    fIn: tPreloadedFile;
+    fOut: tBufWriteFile;
+    UrlData: tUrlData;
+begin
+    Write('Clearing ', cUrlDb + IntToStr(DbNr), ' ... Loading... ');
+
+    fIn := tPreloadedFile.Create;
+    fIn.Assign(cUrlDb + IntToStr(DbNr));
+    fIn.OpenRead;
+    fIn.Preload;
+
+    fOut := tBufWriteFile.Create;
+    fOut.Assign(cUrlDb + IntToStr(DbNr)+'.new');
+    fOut.ReWrite;
+
+    Write('Writing... ');
+    fIn.Read(HashTable[DbNr], SizeOf(tHashTable));
+    fIn.Read(UrlAn[DbNr], 4);
+    fOut.Write(HashTable[DbNr], SizeOf(tHashTable));
+    fOut.Write(UrlAn[DbNr], 4);
+
+    while not fIn.eof do
+    begin
+        fIn.Read(UrlData, SizeOf(UrlData));
+        UrlData.InfPo := -1;
+        UrlData.Priority := prNormal;
+        fOut.Write(UrlData, SizeOf(UrlData));
+    end;
+
+
+    fIn.Close;
+    fIn.Free;
+    fOut.Close;
+    fOut.Free;
+
+    DeleteFile(cUrlDb + IntToStr(DbNr));
+    RenameFile(cUrlDb + IntToStr(DbNr) + '.new', cUrlDb + IntToStr(DbNr));
+
+    DeleteFile(cInfDb + IntToStr(DbNr));
+    fOut := tBufWriteFile.Create;
+    fOut.Assign(cInfDb + IntToStr(DbNr));
+    fOut.ReWrite;
+    fOut.Close;
+    fOut.Free;
+
+    WriteLn('Done.');
+end;
+
+
+
+procedure ClearDb;
+var
+    DbNr: integer;
+begin
+    for DbNr := StartDbNr to EndDbNr do
+    begin
+        ClearDbNr(DbNr);
+    end;
+end;
+
+
 begin
     WriteLn('ImportUrls ', cVersionCopy);
     WriteLn(cGPLNotice);
     WriteLn;
 
     CheckParameters;
+
+    if DoClearDb then
+    begin
+        ClearDb;
+        halt;
+    end;
+
     if DoRoundRobin then
     begin
         if FileExists(cRoundRobinFile) then
