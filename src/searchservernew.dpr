@@ -1909,24 +1909,27 @@ begin
         Li.Free;
         CloseSnippetDatabases;
 
-        Inc(Searchs);
-        Ti := GetTickCount - Ti;
-        if Ti < 0 then
-            Ti := 0;
-        Ticks := Ticks + Ti;
-        if Ti < MinTicks then
-            MinTicks := Ti;
-        if Ti > MaxTicks then
-            MaxTicks := Ti;
-        FormatSettings.LongTimeFormat := 'hh:nn:ss';
-        Str(Ti: 5, s);
-        if Ti >= 0 then
+        if not ThisIsCachedResult then
         begin
-            AddToMemo(s + 'ms ' + '(' + IntToStr(ResultCount)
-            + ') ' + Begriff + '(' + IntToStr(KeyWordCount)
-            + ')' + ' - ' + IntToStr(Ti3 - Ti2) + '/' + IntToStr
-            (GetTickCount - Ti3) + ' (' + IntToStr(Ti5)
-            + '/' + IntToStr(Ti6) + ')');
+            Inc(Searchs);
+            Ti := GetTickCount - Ti;
+            if Ti < 0 then
+                Ti := 0;
+            Ticks := Ticks + Ti;
+            if Ti < MinTicks then
+                MinTicks := Ti;
+            if Ti > MaxTicks then
+                MaxTicks := Ti;
+            FormatSettings.LongTimeFormat := 'hh:nn:ss';
+            Str(Ti: 5, s);
+            if Ti >= 0 then
+            begin
+                AddToMemo(s + 'ms ' + '(' + IntToStr(ResultCount)
+                + ') ' + Begriff + '(' + IntToStr(KeyWordCount)
+                + ')' + ' - ' + IntToStr(Ti3 - Ti2) + '/' + IntToStr
+                (GetTickCount - Ti3) + ' (' + IntToStr(Ti5)
+                + '/' + IntToStr(Ti6) + ')');
+            end;
         end;
 
         // ShowQueryStatistics;
