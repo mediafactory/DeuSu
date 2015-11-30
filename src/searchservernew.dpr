@@ -14,6 +14,9 @@ program searchservernew;
     GNU General Public License for more details.
 *)
 
+{$UNDEF DISABLE_RESULT_CACHING}
+{$UNDEF DISABLE_FANCY_HITS}
+
 uses
     {$ifdef Unix}
     cthreads,
@@ -37,6 +40,8 @@ uses
     SyncObjs,
     Words;
 
+
+
 const
     cMaxKeywords = 10; // This defines the maximum number of keywords per query
     cMaxTempPages = 32768; // Size of read-buffer used during query-processing
@@ -50,13 +55,9 @@ const
 
     cMaxCachedResults = 2 * 1024 - 1;
 
+
+
 type
-    tFilter = array [0 .. cMaxPagesPerShard] of byte;
-    pFilter = ^tFilter;
-    tBitField = array [0 .. 10 * 1000 * 1000] of int32; { Reicht für ca. 2,5 Mrd. Seiten }
-    pBitField = ^tBitField;
-    tValues = array [0 .. 10 * 1000 * 1000] of uint16; { Reicht für ca. 640 Mio. Seiten }
-    pValues = ^tValues;
     tAction = (acSet, acAnd, acNot);
 
     tCachedResult = record
@@ -65,10 +66,6 @@ type
         MaxValue, Count: integer;
         Query: shortstring;
     end;
-
-    tRankDataArray = array of int32;
-    tBackLinkDataArray = array of int32;
-    tUrlDataArray = array of byte;
 
     tRWIWorkChunk = record
         RWIData: array of uint32;
@@ -92,12 +89,13 @@ type
     tValueArray = array of int32;
 
 
+
 var
     ServerObject: tServerObject;
-    RankData: array [0 .. cDbCount - 1] of tRankDataArray;
-    BackLinkData: array [0 .. cDbCount - 1] of tBackLinkDataArray;
+    RankData: array of int32;
+    BackLinkData: array of int32;
     MaxBackLinkCount: int64;
-    UrlData: array [0 .. cDbCount - 1] of tUrlDataArray;
+    UrlData: array of byte;
     OrgRbs: RawByteString;
     CachedResults: array [0 .. cMaxCachedResults] of tCachedResult;
     CacheUsed: array [0 .. cMaxCachedResults] of boolean;
@@ -115,16 +113,11 @@ var
     KeyWordIsHostName: array [1 .. cMaxKeywords] of boolean;
     KeyWordResultCount: array [1 .. cMaxKeywords] of int32;
     KeyWordAction: array [1 .. cMaxKeywords] of tAction;
-
-    BitField, TempBitField: array [0 .. cDbCount - 1] of pBitField;
-    BitFieldSize: array [0 .. cDbCount - 1] of integer;
-    Values: array [0 .. cDbCount - 1] of pValues;
-    ValueSize: array [0 .. cDbCount - 1] of integer;
-
+    BitField, TempBitField: array of uint32;
+    Values: array of uint16;
     Html: array [0 .. cDbCount - 1] of tFileStream;
     TempBuf: array [1 .. cMaxTempPages] of int32;
-    FilterData: array [0 .. cDbCount - 1] of pFilter;
-    FilterDataSize: array [0 .. cDbCount - 1] of integer;
+    FilterData: array of byte;
     ShowCount: integer;
     MaxValue: integer;
     ResultCount: integer;
@@ -133,7 +126,6 @@ var
     Searchs: integer;
     NoResults: integer;
     ValueTable: array [0 .. 65535] of int32;
-    //ValueData: array [0 .. 65535, 1 .. 1024] of int32;
     KeyDbs, FancyDbs: array [0 .. 63] of tCacheFile;
     BitFieldInitialized: boolean;
     Counter: integer;
@@ -149,7 +141,9 @@ var
     FeatureFlags: tFeatureFlags;
     CorpusSize: int64;
     InverseDocumentFrequency: double;
-    NewValueData: array[0..65535] of tValueArray;
+    ValueData: array[0..65535] of tValueArray;
+    BackLinkValueArray: array of double;
+
 
 
 
@@ -159,32 +153,32 @@ var
     CurrentSize: int32;
     NewSize: int32;
 begin
-    CurrentSize := Length(NewValueData[Value]);
+    CurrentSize := Length(ValueData[Value]);
     NewSize := CurrentSize + 10;
     if NewSize > 1024 then NewSize := 1024;
-    SetLength(NewValueData[Value], NewSize);
+    SetLength(ValueData[Value], NewSize);
 end;
 
 
 
-procedure SetValueData(Value, Index, DocId: int32);
+procedure SetValueData(Value, Index, DocId: int32); inline;
 begin
     Dec(Index);
-    if Index > High(NewValueData[Value]) then
+    if Index > High(ValueData[Value]) then
         ResizeValueArray(Value, Index+1);
 
-    NewValueData[Value][Index] := DocId;
+    ValueData[Value][Index] := DocId;
 end;
 
 
 
-function GetValueData(Value, Index: int32):int32;
+function GetValueData(Value, Index: int32):int32; inline;
 begin
     Dec(Index);
-    if Index > High(NewValueData[Value]) then
+    if Index > High(ValueData[Value]) then
         ResizeValueArray(Value, Index+1);
 
-    Result := NewValueData[Value][Index];
+    Result := ValueData[Value][Index];
 end;
 
 
@@ -195,34 +189,34 @@ var
 begin
     for i := 0 to 65535 do
     begin
-        SetLength(NewValueData[i], 10);
+        SetLength(ValueData[i], 10);
     end;
 end;
 
 
 
-
-function LookupDomainRank(DocID: integer): integer; inline;
+procedure InitBackLinkValueArray;
+var
+    i: int32;
+    ln_mbl: double;
 begin
-    Result := RankData[DocID and (cDbCount - 1)][DocID shr cDbBits];
+    SetLength(BackLinkValueArray, MaxBackLinkCount+1);
+    if MaxBackLinkCount>0 then ln_mbl := ln(MaxBackLinkCount);
+    for i := 0 to High(BackLinkValueArray) do
+    begin
+        if i = 0 then BackLinkValueArray[i] := 1.0
+        else BackLinkValueArray[i] := 2500.0 * ln(i) / ln_mbl;
+    end;
 end;
 
 
-function LookupUrlData(DocID: integer): integer; inline;
-begin
-    Result := UrlData[DocID and (cDbCount - 1)][DocID shr cDbBits];
-end;
 
-
-
-function GetBackLinkValue(DbNr, Index: int32): double;
+function GetBackLinkValue(DocID: int32): double; inline;
 var
     BackLinkCount: int64;
 begin
-    BackLinkCount := BackLinkData[DbNr][Index];
-    if (BackLinkCount = 0) or (MaxBackLinkCount <= 1) then Result := 1.0
-    else Result := 2500.0 * ln(BackLinkCount) / ln(MaxBackLinkCount);
-    //else Result := 1000000.0 * (1.0 + ln(BackLinkCount));
+    BackLinkCount := BackLinkData[DocID];
+    Result := BackLinkValueArray[BackLinkCount];
 end;
 
 
@@ -246,6 +240,7 @@ begin
 end;
 
 
+
 procedure ResetStatistics;
 begin
     Searchs := 0;
@@ -257,11 +252,13 @@ begin
 end;
 
 
+
 procedure AddToMemo(Txt: string);
 begin
     exit;
     WriteLn(Txt);
 end;
+
 
 
 function FindParam(const Name: AnsiString): string;
@@ -372,6 +369,7 @@ begin
 end;
 
 
+
 procedure ExtractKeywords;
 var
     i: integer;
@@ -408,6 +406,7 @@ begin
 end;
 
 
+
 procedure ReadString(var Fi: tFileStream; var s: shortstring);
 begin
     Fi.Read(s, 1);
@@ -416,12 +415,12 @@ begin
 end;
 
 
+
 procedure FindThisHost(const ThisHost: shortstring; Action: tAction);
 var
     Hosts: tFileStream;
     HashCode: int32;
-    DbNr, Index: integer;
-    i, Data, ThisValue, NewValue: integer;
+    i, Data, ThisValue, NewValue: int32;
     s: shortstring;
     Po, An: int32;
     ThisAn, fd: integer;
@@ -430,21 +429,16 @@ begin
         acSet:
             begin
                 BitFieldInitialized := true;
-                for i := 0 to cDbCount - 1 do
-                begin
-                    FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
-                end;
+                FillChar(BitField[0], Length(BitField)*4, 0);
                 FillChar(ValueTable, SizeOf(ValueTable), 0);
             end;
         acAnd:
             begin
-                for i := 0 to cDbCount - 1 do
-                    FillChar(TempBitField[i]^, BitFieldSize[i] * 4, 0);
+                FillChar(TempBitField[0], Length(TempBitField)*4, 0);
             end;
         acNot:
             begin
-                for i := 0 to cDbCount - 1 do
-                    FillChar(TempBitField[i]^, BitFieldSize[i] * 4, 255);
+                FillChar(TempBitField[0], Length(TempBitField)*4, 255);
             end;
     end;
 
@@ -471,13 +465,11 @@ begin
                 for i := 1 to ThisAn do
                 begin
                     Data := TempBuf[i];
-                    DbNr := Data and (cDbCount - 1);
-                    Index := Data shr cDbBits;
-                    fd := FilterData[DbNr]^[Index];
+                    fd := FilterData[Data shr 3];
                     ThisValue := b1;
                     Inc(ThisValue, (31 - (fd and 31)) * b7);
                     if Action = acSet then
-                        Inc(ThisValue, Round(GetBackLinkValue(DbNr, Index)));
+                        Inc(ThisValue, Round(GetBackLinkValue(Data shr 3)));
                     if ThisValue < 1 then ThisValue := 1;
                     if ThisValue > 65535 then ThisValue := 65535;
 
@@ -485,13 +477,13 @@ begin
                         acSet:
                             begin
                                 Inc(ValueTable[ThisValue]);
-                                Values[DbNr]^[Index] := ThisValue;
-                                Inc(BitField[DbNr]^[Index shr 5], 1 shl (Index and 31));
+                                Values[Data shr 3] := ThisValue;
+                                Inc(BitField[Data shr 8], 1 shl ((Data shr 3) and 31));
                             end;
                         acAnd:
                             begin
-                                if (BitField[DbNr]^[Index shr 5] and (1 shl (Index and 31))) > 0 then
-                                    NewValue := Values[DbNr]^[Index]
+                                if (BitField[Data shr 8] and (1 shl ((Data shr 3) and 31))) > 0 then
+                                    NewValue := Values[Data shr 3]
                                 else NewValue := 0;
 
                                 Dec(ValueTable[NewValue]);
@@ -501,14 +493,12 @@ begin
 
 
                                 Inc(ValueTable[NewValue]);
-                                Values[DbNr]^[Index] := NewValue;
-                                TempBitField[DbNr]^[Index shr 5] :=
-                                TempBitField[DbNr]^[Index shr 5] + (1 shl (Index and 31));
-
+                                Values[Data shr 3] := NewValue;
+                                Inc(TempBitField[Data shr 8], 1 shl ((Data shr 3) and 31));
                             end;
                         acNot:
                             begin
-                                Dec(TempBitField[DbNr]^[Index shr 5], 1 shl (Index and 31));
+                                Dec(TempBitField[Data shr 8], 1 shl ((Data shr 3) and 31));
                             end;
                     end; { case Action of }
                 end; { For-Schleife }
@@ -519,9 +509,8 @@ begin
             case Action of
                 acAnd, acNot:
                     begin
-                        for DbNr := 0 to cDbCount - 1 do
-                            for i := 0 to BitFieldSize[DbNr] - 1 do
-                                BitField[DbNr]^[i] := BitField[DbNr]^[i] and TempBitField[DbNr]^[i];
+                        for i := 0 to High(BitField) do
+                            BitField[i] := BitField[i] and TempBitField[i];
                     end; { acAnd, acNot }
             end;
 
@@ -534,8 +523,7 @@ begin
             begin
                 Hosts.Free;
                 if Action = acAnd then
-                    for i := 0 to cDbCount - 1 do
-                        FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
+                    FillChar(BitField[0], Length(BitField) * 4, 0);
                 exit;
             end;
         end;
@@ -543,15 +531,14 @@ begin
 
     Hosts.Free;
     if Action = acAnd then
-        for i := 0 to cDbCount - 1 do
-            FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
+        FillChar(BitField[0], Length(BitField) * 4, 0);
 end;
+
 
 
 procedure ProcessThisKeyViaAnd(ThisAn: integer);
 var
     i: integer;
-    DbNr, Index: integer;
     Data: integer;
     IndexShl: array [0 .. 31] of integer;
     ThisValue, NewValue, ThisRankValue: integer;
@@ -578,36 +565,37 @@ begin
     for i := 1 to ThisAn do
     begin
         Data := TempBuf[i];
-        DbNr := (Data shr 3) and (cDbCount - 1);
-        Index := Data shr (3 + cDbBits);
-        if ((BitField[DbNr]^[Index shr 5] and IndexShl[Index and 31]) > 0) then
+        if ((BitField[Data shr 8] and IndexShl[(Data shr 3) and 31]) > 0) then
         begin
-            fd := FilterData[DbNr]^[Index];
+            fd := FilterData[Data shr 3];
             ThisValue := BaseValue[(Data and 7) or ((fd shr 3) and 24)];
 
             if PreferDe and ((fd and 32) <> 0) then Inc(ThisValue, 10);
             if PreferEn and ((fd and 32) = 0) then Inc(ThisValue, 10);
             Inc(ThisValue, (31 - (fd and 31)) * b7);
 
-            ThisRankValue := LookupDomainRank((Index shl cDbBits) or DbNr) + 1;
-            ThisUrlData := LookupUrlData((Index shl cDbBits) or DbNr) + 1;
-            HostElements := ThisUrlData and 15;
-            // HostElements := 1;
+
+            ThisRankValue := RankData[Data shr 3] + 1;
+
+            ThisUrlData := UrlData[Data shr 3];
+            HostElements := (ThisUrlData and 15) + 1;
 
             if ThisRankValue = 0 then ThisRankValue := 1000001;
 
-            ThisValue := Round((1.0 - ThisRankValue * 0.000000027) *
-                ThisValue / HostElements * InverseDocumentFrequency);
-
+            //Inc(ThisValue, Round(GetBackLinkValue(Data shr 3)));
+            ThisValue :=
+                Round((1.0 - ThisRankValue * 0.000000027) *
+                    ThisValue / HostElements *
+                    InverseDocumentFrequency);
 
 
             if ThisValue > 65535 then ThisValue := 65535;
 
-            TempBit := TempBitField[DbNr]^[Index shr 5];
-            NewValue := Values[DbNr]^[Index] + ThisValue;
+            TempBit := TempBitField[Data shr 8];
+            NewValue := Values[Data shr 3] + ThisValue;
             if NewValue > 65535 then NewValue := 65535;
-            Values[DbNr]^[Index] := NewValue;
-            TempBitField[DbNr]^[Index shr 5] := TempBit + IndexShl[Index and 31];
+            Values[Data shr 3] := NewValue;
+            TempBitField[Data shr 8] := TempBit + IndexShl[(Data shr 3) and 31];
         end;
 
     end; { For }
@@ -751,24 +739,35 @@ var
     An: int32;
     Po: int64;
     Po32: uint32;
-    i, An2, ThisAn: integer;
+    i, ThisAn: integer;
     ThisValue, NewValue: integer;
-    DbNr, Index: integer;
     Data: integer;
     IndexShl: array [0 .. 31] of integer;
     TempBit: integer;
     fd: integer;
     AllLocations, TitleOnly, UrlOnly: boolean;
     ThisRankValue: integer;
-    //ThisRankFactor: double;
     ThisUrlData: byte;
-    PathElements, HostElements: byte;
+    HostElements: byte;
     TopHitsPointer: int64;
     THP32, PreviousDocumentID: int32;
+    ValueFlags: array[0..255] of integer;
 begin
     Ti4 := GetTickCount;
     Ti5 := 0;
     Ti6 := 0;
+
+    for i := 0 to 255 do
+    begin
+        ThisValue := b1;
+        if (i and 1) <> 0 then Inc(ThisValue, b2); // InSnippet
+        if (i and 2) <> 0 then Inc(ThisValue, b3); // InTitle
+        if (i and 4) <> 0 then Inc(ThisValue, b4); // InUrl
+        if (i and 128) <> 0 then Inc(ThisValue, b5); // IsDomainRoot
+        if (i and 64) <> 0 then Inc(ThisValue, b6); // Starts with "www."
+        ValueFlags[i] := ThisValue;
+    end;
+
 
     if (LowerCase(copy(ThisKey, 1, 5)) = 'host:') or
     (LowerCase(copy(ThisKey, 1, 5)) = 'site:') then
@@ -823,15 +822,13 @@ begin
                 FillChar(ValueTable, SizeOf(ValueTable), 0);
                 if KeyWordCount > 1 then
                 begin
-                    for i := 0 to cDbCount - 1 do
-                        FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
+                    FillChar(BitField[0], Length(BitField) * 4, 0);
                     BitFieldInitialized := true;
                 end;
             end;
         acAnd:
             begin
-                for i := 0 to cDbCount - 1 do
-                    FillChar(TempBitField[i]^, BitFieldSize[i] * 4, 0);
+                FillChar(TempBitField[0], Length(TempBitField) * 4, 0);
             end;
     end;
 
@@ -871,8 +868,7 @@ begin
         if s = '' then
         begin
             if Action = acAnd then
-                for i := 0 to cDbCount - 1 do
-                    FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
+                FillChar(BitField[0], Length(BitField) * 4, 0);
             Ti6 := GetTickCount - Ti5 - Ti4;
             exit;
         end;
@@ -901,8 +897,7 @@ begin
 
             if (Action = acSet) and (not BitFieldInitialized) and (An > 0) then
             begin
-                for i := 0 to cDbCount - 1 do
-                    FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
+                FillChar(BitField[0], Length(BitField) * 4, 0);
                 BitFieldInitialized := true;
             end;
 
@@ -945,53 +940,37 @@ begin
                     for i := 1 to ThisAn do
                     begin
                         Data := TempBuf[i];
-                        DbNr := (Data shr 3) and (cDbCount - 1);
-                        Index := Data shr (3 + cDbBits);
-                        if (AllLocations or (UrlOnly and ((Data and 4) <> 0)) or
-                        (TitleOnly and ((Data and 2) <> 0))) and
-                        ((FilterMask = 0) or
-                        ((FilterMask <> 0) and ((FilterData[DbNr]^[Index] and FilterMask) <> 0)))
+                        if  (AllLocations or (UrlOnly and ((Data and 4) <> 0)) or
+                            (TitleOnly and ((Data and 2) <> 0))) and
+                            ((FilterMask = 0) or
+                            ((FilterMask <> 0) and ((FilterData[Data shr 3] and FilterMask) <> 0)))
                         then
                         begin
 
-                            if ((Action = acAnd) and ((BitField[DbNr]^[Index shr 5] and
-                            IndexShl[Index and 31]) > 0)) or (Action <> acAnd) then
+                            if  ((Action = acAnd) and
+                                ((BitField[Data shr 8] and IndexShl[(Data shr 3) and 31]) > 0))
+                                or (Action <> acAnd) then
                             begin
-                                ThisValue := b1;
+                                fd := FilterData[Data shr 3];
+                                ThisValue := ValueFlags[(Data and 7) or (fd and 192)];
 
-                                // Keyword exists in description
-                                if (Data and 1) <> 0 then Inc(ThisValue, b2);
 
-                                // Keyword is in title
-                                if (Data and 2) <> 0 then Inc(ThisValue, b3);
-
-                                // Keyword is in URL
-                                if (Data and 4) <> 0 then Inc(ThisValue, b4);
-
-                                fd := FilterData[DbNr]^[Index];
-
-                                // URL is domain-root ( = www.somedomain.com/ )
-                                if (fd and 128) <> 0 then Inc(ThisValue, b5);
-
-                                if (fd and 64) <> 0 then Inc(ThisValue, b6);
                                 if PreferDe and ((fd and 32) <> 0) then Inc(ThisValue, 10);
                                 if PreferEn and ((fd and 32) = 0) then Inc(ThisValue, 10);
                                 Inc(ThisValue, (31 - (fd and 31)) * b7);
 
-                                ThisRankValue := LookupDomainRank((Index shl cDbBits) or DbNr) + 1;
-                                ThisUrlData := LookupUrlData((Index shl cDbBits) or DbNr) + 1;
-                                HostElements := ThisUrlData and 15;
-                                // HostElements := 1;
+                                ThisRankValue := RankData[Data shr 3] + 1;
+
+                                ThisUrlData := UrlData[Data shr 3];
+                                HostElements := (ThisUrlData and 15) + 1;
 
                                 if ThisRankValue = 0 then ThisRankValue := 1000001;
 
-                                Inc(ThisValue, Round(GetBackLinkValue(DbNr, Index)));
+                                Inc(ThisValue, Round(GetBackLinkValue(Data shr 3)));
                                 ThisValue :=
                                     Round((1.0 - ThisRankValue * 0.000000027) *
                                         ThisValue / HostElements *
                                         InverseDocumentFrequency);
-
-
 
                                 if ThisValue > 65535 then ThisValue := 65535;
                             end;
@@ -1001,8 +980,8 @@ begin
                                     begin
                                         if KeyWordCount > 1 then
                                         begin
-                                            Values[DbNr]^[Index] := ThisValue;
-                                            Inc(BitField[DbNr]^[Index shr 5], IndexShl[Index and 31]);
+                                            Values[Data shr 3] := ThisValue;
+                                            Inc(BitField[Data shr 8], IndexShl[(Data shr 3) and 31]);
                                         end
                                         else
                                         begin
@@ -1011,29 +990,26 @@ begin
                                             Inc(ValueTable[ThisValue]);
                                             if ValueTable[ThisValue] <= 1024 then
                                             begin
-                                                //ValueData[ThisValue, ValueTable[ThisValue]] :=
-                                                //    (Index shl cDbBits) or DbNr;
-                                                SetValueData(ThisValue, ValueTable[ThisValue],
-                                                    (Index shl cDbBits) or DbNr);
+                                                SetValueData(ThisValue, ValueTable[ThisValue], Data shr 3);
                                             end;
                                         end;
                                     end;
                                 acAnd:
                                     begin
-                                        if (BitField[DbNr]^[Index shr 5] and IndexShl[Index and 31]) > 0 then
+                                        if (BitField[Data shr 8] and IndexShl[(Data shr 3) and 31]) > 0 then
                                         begin
-                                            TempBit := TempBitField[DbNr]^[Index shr 5];
-                                            NewValue := Values[DbNr]^[Index] + ThisValue;
+                                            TempBit := TempBitField[Data shr 8];
+                                            NewValue := Values[Data shr 3] + ThisValue;
                                             if NewValue > 65535 then NewValue := 65535;
-                                            Values[DbNr]^[Index] := NewValue;
-                                            TempBitField[DbNr]^[Index shr 5] :=
-                                            TempBit + IndexShl[Index and 31];
+                                            Values[Data shr 3] := NewValue;
+                                            TempBitField[Data shr 8] :=
+                                                TempBit + IndexShl[(Data shr 3) and 31];
                                         end;
                                     end;
                                 acNot:
                                     begin
-                                        BitField[DbNr]^[Index shr 5] := BitField[DbNr]^[Index shr 5] and
-                                        (not IndexShl[Index and 31]);
+                                        BitField[Data shr 8] := BitField[Data shr 8] and
+                                            (not IndexShl[(Data shr 3) and 31]);
                                     end;
                             end; { case Action of }
                         end; { Is in Filtermask }
@@ -1047,13 +1023,11 @@ begin
             if Action = acAnd then
             begin
                 TempBit := 0;
-                for DbNr := 0 to cDbCount - 1 do
-                    for i := 0 to BitFieldSize[DbNr] - 1 do
-                    begin
-                        BitField[DbNr]^[i] :=
-                        BitField[DbNr]^[i] and TempBitField[DbNr]^[i];
-                        TempBit := TempBit or BitField[DbNr]^[i];
-                    end;
+                for i := 0 to High(BitField) do
+                begin
+                    BitField[i] := BitField[i] and TempBitField[i];
+                    TempBit := TempBit or BitField[i];
+                end;
                 if TempBit = 0 then
                 begin
                     EarlyAbort := true;
@@ -1069,8 +1043,7 @@ begin
             if Po32 = 0 then
             begin
                 if Action = acAnd then
-                    for i := 0 to cDbCount - 1 do
-                        FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
+                    FillChar(BitField[0], Length(BitField) * 4, 0);
                 Ti6 := GetTickCount - Ti5 - Ti4;
                 exit;
             end;
@@ -1081,8 +1054,7 @@ begin
     end;
 
     if Action = acAnd then
-        for i := 0 to cDbCount - 1 do
-            FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
+        FillChar(BitField[0], Length(BitField) * 4, 0);
 
     Ti6 := GetTickCount - Ti5 - Ti4;
 end;
@@ -1158,12 +1130,12 @@ begin
 end;
 
 
+
 procedure FindKeys;
 var
     i: integer;
     ThisKey: shortstring;
     Method: (logAnd, logNot);
-    s: string;
     ThisMax, ThisValue: integer;
     HashCode: integer;
 begin
@@ -1183,9 +1155,8 @@ begin
     if FindParam('preferen') <> '' then ThisQuery := ThisQuery + #255 + 'preferen=on';
     if FindParam('geronly') <> '' then ThisQuery := ThisQuery + #255 + 'geronly=on';
 
-  (* Disable this code because there is a chance that something may be wrong with the cache.
-     Not necessarily with this code, but maybe with the adding to cache. *)
     HashCode := CalcCRC(ThisQuery) and cMaxCachedResults;
+    {$IFNDEF DISABLE_FANCY_HITS}
     if CacheUsed[HashCode] then
     begin
         if CachedResults[HashCode].Query = ThisQuery then
@@ -1202,21 +1173,15 @@ begin
             begin
                 ThisValue := CachedResults[HashCode].Values[i];
                 Inc(ValueTable[ThisValue]);
-                //ValueData[ThisValue, ValueTable[ThisValue]] := CachedResults[HashCode].Pages[i];
                 SetValueData(ThisValue, ValueTable[ThisValue], CachedResults[HashCode].Pages[i]);
             end;
             exit;
         end;
     end;
+    {$ENDIF}
 
     if KeyWordCount = 0 then
-    begin
-        for i := 0 to cDbCount - 1 do
-        begin
-            FillChar(BitField[i]^, BitFieldSize[i] * 4, 0);
-            BitField[i]^[BitFieldSize[i] - 1] := 0;
-        end;
-    end;
+        FillChar(BitField[0], Length(BitField) * 4, 0);
 
     OptimizeQuery;
 
@@ -1262,6 +1227,7 @@ begin
 end;
 
 
+
 procedure ShowLink(Nr, Value, LfdNr: integer; Li: tStringList);
 var
     Url: shortstring;
@@ -1291,9 +1257,10 @@ begin
     Li.Add('text=' + s);
     Li.Add('rel=' + IntToStr(Value));
 
-    Li.Add('domainrank=' + IntToStr(LookupDomainRank(DocID)));
-    Li.Add('backlinks=' + IntToStr(BackLinkData[DbNr][Nr shr cDbBits]));
+    Li.Add('domainrank=' + IntToStr(RankData[DocID]));
+    Li.Add('backlinks=' + IntToStr(BackLinkData[DocID]));
 end;
+
 
 
 procedure GenResults(Li: tStringList);
@@ -1303,9 +1270,7 @@ var
     Data: integer;
     EndWithNr: integer;
     ThisValue: integer;
-    DbNr, HashCode: integer;
-    BitFieldPtr: pBitField;
-    ValuesPtr: pValues;
+    HashCode: integer;
     f: TextFile;
     s: string;
 begin
@@ -1314,120 +1279,106 @@ begin
         MaxValue := 1;
         FillChar(ValueTable, SizeOf(ValueTable), 0);
 
-        for DbNr := 0 to cDbCount - 1 do
+        for i := 0 to High(BitField) do
         begin
-            BitFieldPtr := BitField[DbNr];
-            ValuesPtr := Values[DbNr];
-
-            for i := 0 to BitFieldSize[DbNr] - 1 do
+            if BitField[i] <> 0 then
             begin
-                if BitFieldPtr^[i] <> 0 then
+                Data := BitField[i];
+                i32 := i * 32;
+
+                if (Data and 255) <> 0 then
                 begin
-                    Data := BitFieldPtr^[i];
-                    i32 := i * 32;
-
-                    if (Data and 255) <> 0 then
+                    for j := 0 to 7 do
                     begin
-                        for j := 0 to 7 do
+                        if (Data and 1) > 0 then
                         begin
-                            if (Data and 1) > 0 then
-                            begin
-                                Inc(Count);
-                                ThisValue := ValuesPtr^[i32];
-                                if ThisValue > MaxValue then MaxValue := ThisValue;
-                                Inc(ValueTable[ThisValue]);
-                                if ValueTable[ThisValue] <= 1001 then
-                                    //ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
-                                    SetValueData(ThisValue, ValueTable[ThisValue],
-                                        ((i32) shl cDbBits) or DbNr);
-                            end;
-                            Data := Data shr 1;
-                            Inc(i32);
+                            Inc(Count);
+                            ThisValue := Values[i32];
+                            if ThisValue > MaxValue then MaxValue := ThisValue;
+                            Inc(ValueTable[ThisValue]);
+                            if ValueTable[ThisValue] <= 1001 then
+                                SetValueData(ThisValue, ValueTable[ThisValue], i32);
                         end;
-                    end
-                    else
-                    begin
-                        Data := Data shr 8;
-                        Inc(i32, 8);
+                        Data := Data shr 1;
+                        Inc(i32);
                     end;
-
-
-
-                    if (Data and 255) <> 0 then
-                    begin
-                        for j := 0 to 7 do
-                        begin
-                            if (Data and 1) > 0 then
-                            begin
-                                Inc(Count);
-                                ThisValue := ValuesPtr^[i32];
-                                if ThisValue > MaxValue then MaxValue := ThisValue;
-                                Inc(ValueTable[ThisValue]);
-                                if ValueTable[ThisValue] <= 1001 then
-                                    //ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
-                                    SetValueData(ThisValue, ValueTable[ThisValue],
-                                        ((i32) shl cDbBits) or DbNr);
-                            end;
-                            Data := Data shr 1;
-                            Inc(i32);
-                        end;
-                    end
-                    else
-                    begin
-                        Data := Data shr 8;
-                        Inc(i32, 8);
-                    end;
-
-
-
-                    if (Data and 255) <> 0 then
-                    begin
-                        for j := 0 to 7 do
-                        begin
-                            if (Data and 1) > 0 then
-                            begin
-                                Inc(Count);
-                                ThisValue := ValuesPtr^[i32];
-                                if ThisValue > MaxValue then MaxValue := ThisValue;
-                                Inc(ValueTable[ThisValue]);
-                                if ValueTable[ThisValue] <= 1001 then
-                                    //ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
-                                    SetValueData(ThisValue, ValueTable[ThisValue],
-                                        ((i32) shl cDbBits) or DbNr);
-                            end;
-                            Data := Data shr 1;
-                            Inc(i32);
-                        end;
-                    end
-                    else
-                    begin
-                        Data := Data shr 8;
-                        Inc(i32, 8);
-                    end;
-
-
-
-                    if (Data and 255) <> 0 then
-                    begin
-                        for j := 0 to 7 do
-                        begin
-                            if (Data and 1) > 0 then
-                            begin
-                                Inc(Count);
-                                ThisValue := ValuesPtr^[i32];
-                                if ThisValue > MaxValue then MaxValue := ThisValue;
-                                Inc(ValueTable[ThisValue]);
-                                if ValueTable[ThisValue] <= 1001 then
-                                    //ValueData[ThisValue, ValueTable[ThisValue]] := ((i32) shl cDbBits) or DbNr;
-                                    SetValueData(ThisValue, ValueTable[ThisValue],
-                                        ((i32) shl cDbBits) or DbNr);
-                            end;
-                            Data := Data shr 1;
-                            Inc(i32);
-                        end;
-                    end;
-
+                end
+                else
+                begin
+                    Data := Data shr 8;
+                    Inc(i32, 8);
                 end;
+
+
+
+                if (Data and 255) <> 0 then
+                begin
+                    for j := 0 to 7 do
+                    begin
+                        if (Data and 1) > 0 then
+                        begin
+                            Inc(Count);
+                            ThisValue := Values[i32];
+                            if ThisValue > MaxValue then MaxValue := ThisValue;
+                            Inc(ValueTable[ThisValue]);
+                            if ValueTable[ThisValue] <= 1001 then
+                                SetValueData(ThisValue, ValueTable[ThisValue], i32);
+                        end;
+                        Data := Data shr 1;
+                        Inc(i32);
+                    end;
+                end
+                else
+                begin
+                    Data := Data shr 8;
+                    Inc(i32, 8);
+                end;
+
+
+
+                if (Data and 255) <> 0 then
+                begin
+                    for j := 0 to 7 do
+                    begin
+                        if (Data and 1) > 0 then
+                        begin
+                            Inc(Count);
+                            ThisValue := Values[i32];
+                            if ThisValue > MaxValue then MaxValue := ThisValue;
+                            Inc(ValueTable[ThisValue]);
+                            if ValueTable[ThisValue] <= 1001 then
+                                SetValueData(ThisValue, ValueTable[ThisValue], i32);
+                        end;
+                        Data := Data shr 1;
+                        Inc(i32);
+                    end;
+                end
+                else
+                begin
+                    Data := Data shr 8;
+                    Inc(i32, 8);
+                end;
+
+
+
+                if (Data and 255) <> 0 then
+                begin
+                    for j := 0 to 7 do
+                    begin
+                        if (Data and 1) > 0 then
+                        begin
+                            Inc(Count);
+                            ThisValue := Values[i32];
+                            if ThisValue > MaxValue then MaxValue := ThisValue;
+                            Inc(ValueTable[ThisValue]);
+                            if ValueTable[ThisValue] <= 1001 then
+                                SetValueData(ThisValue, ValueTable[ThisValue], i32);
+                        end;
+                        Data := Data shr 1;
+                        Inc(i32);
+                    end;
+                end;
+
             end;
         end;
     end;
@@ -1477,7 +1428,6 @@ begin
             Inc(Nr);
             if (Nr >= StartWithNr) and (Nr <= EndWithNr) then
             begin
-                //j := ValueData[ThisValue, i];
                 j := GetValueData(ThisValue, i);
                 if (QueryPass = 2) or (ResultCount >= 1000) then ShowLink(j, ThisValue, Nr, Li);
             end; { Show this link }
@@ -1501,7 +1451,6 @@ begin
                 for i := 1 to ValueTable[ThisValue] do
                 begin
                     Inc(Nr);
-                    //CachedResults[HashCode].Pages[Nr] := ValueData[ThisValue, i];
                     CachedResults[HashCode].Pages[Nr] := GetValueData(ThisValue, i);
                     CachedResults[HashCode].Values[Nr] := ThisValue;
                     if Nr >= 1000 then break;
@@ -1511,6 +1460,7 @@ begin
         end;
     end;
 end;
+
 
 
 procedure RefineSearch;
@@ -1567,6 +1517,7 @@ begin
 end;
 
 
+
 procedure LoadCacheData;
 var
     f: tCacheFile;
@@ -1576,6 +1527,10 @@ var
     Key, Value, s: string;
     IndexExtension: string;
     BackLinkTemp: array of int64;
+    FilterTemp: array of byte;
+    UrlDataTemp: array of byte;
+    DomainRankTemp: array of int32;
+    DocumentID, ThisDocCount: int32;
 begin
     FeatureFlags.EnableCompressedIndex := false;
 
@@ -1642,24 +1597,32 @@ begin
         f := tCacheFile.Create;
         f.Assign(cSData + 'filter.dat' + IntToStr(i));
         f.Reset;
-        FilterDataSize[i] := f.FileSize;
-        if FilterDataSize[i] < 8 then
-            FilterDataSize[i] := 8;
-        GetMem(FilterData[i], FilterDataSize[i]);
-        f.Read(FilterData[i]^, f.FileSize);
+        Inc(CorpusSize, f.FileSize);
+        f.Close;
+        f.Free;
+    end;
 
-        Inc(CorpusSize, FilterDataSize[i]);
+    SetLength(FilterData, CorpusSize);
+    SetLength(RankData, CorpusSize);
+    SetLength(UrlData, CorpusSize);
+    SetLength(BackLinkData, CorpusSize);
+    SetLength(Values, CorpusSize);
+    SetLength(BitField, (CorpusSize+31) div 32);
+    SetLength(TempBitField, (CorpusSize+31) div 32);
 
-        ValueSize[i] := f.FileSize;
-        if ValueSize[i] < 8 then
-            ValueSize[i] := 8;
-        GetMem(Values[i], ValueSize[i] * 2);
-        BitFieldSize[i] := (f.FileSize + 31) div 32;
-        if BitFieldSize[i] < 8 then
-            BitFieldSize[i] := 8;
-        GetMem(BitField[i], BitFieldSize[i] * 4);
-        GetMem(TempBitField[i], BitFieldSize[i] * 4);
+    DocumentID := 0;
 
+    for i := 0 to cDbCount - 1 do
+    begin
+        f := tCacheFile.Create;
+        f.Assign(cSData + 'filter.dat' + IntToStr(i));
+        f.Reset;
+        ThisDocCount := f.FileSize;
+        SetLength(FilterTemp, ThisDocCount);
+        f.Read(FilterTemp[0], ThisDocCount);
+        for j := 0 to High(FilterTemp) do
+            FilterData[j*cDbCount+i] := FilterTemp[j];
+        SetLength(FilterTemp, 0);
         f.Close;
         f.Free;
 
@@ -1667,14 +1630,14 @@ begin
         f := tCacheFile.Create;
         f.Assign(cSData + 'rank.dat' + IntToStr(i));
         f.Reset;
-	j := f.FileSize;
-	if j < 4 then j := 4;
-        SetLength(RankData[i], j div 4);
-        f.Read(RankData[i][0], f.FileSize);
-        for j := 0 to High(RankData[i]) do
+        SetLength(DomainRankTemp, ThisDocCount);
+        f.Read(DomainRankTemp[0], f.FileSize);
+        for j := 0 to High(DomainRankTemp) do
         begin
-            if RankData[i][j] <> -1 then Inc(NonMinusOne);
+            RankData[j*cDbCount+i] := DomainRankTemp[j];
+            if RankData[j*cDbCount+i] <> -1 then Inc(NonMinusOne);
         end;
+        SetLength(DomainRankTemp, 0);
         f.Close;
         f.Free;
 
@@ -1682,10 +1645,11 @@ begin
         f := tCacheFile.Create;
         f.Assign(cSData + 'rank2.dat' + IntToStr(i));
         f.Reset;
-	j := f.FileSize;
-	if j < 1 then j := 1;
-        SetLength(UrlData[i], j);
-        f.Read(UrlData[i][0], f.FileSize);
+        SetLength(UrlDataTemp, ThisDocCount);
+        f.Read(UrlDataTemp[0], ThisDocCount);
+        for j := 0 to High(UrlDataTemp) do
+            UrlData[j*cDbCount+i] := UrlDataTemp[j];
+        SetLength(UrlDataTemp, 0);
         f.Close;
         f.Free;
 
@@ -1694,26 +1658,29 @@ begin
         f := tCacheFile.Create;
         f.Assign(cSData + 'backlink.dat' + IntToStr(i));
         f.Reset;
-	j := f.FileSize;
-	if j < 8 then j := 8;
-        SetLength(BackLinkData[i], j div 8);
-        SetLength(BackLinkTemp, j div 8);
+        SetLength(BackLinkTemp, f.FileSize div 8);
         f.Read(BackLinkTemp[0], f.FileSize);
-        for j := 0 to High(BackLinkData[i]) do
+        for j := 0 to High(BackLinkTemp) do
         begin
             if BackLinkTemp[j] > 2147483647 then
-                BackLinkData[i][j] := 2147483647
+                BackLinkData[j*cDbCount+i] := 2147483647
             else
-                BackLinkData[i][j] := BackLinkTemp[j];
+                BackLinkData[j*cDbCount+i] := BackLinkTemp[j];
 
-            if BackLinkData[i][j] > MaxBackLinkCount then MaxBackLinkCount := BackLinkData[i][j];
+            if BackLinkData[j*cDbCount+i] > MaxBackLinkCount then
+                MaxBackLinkCount := BackLinkData[j*cDbCount+i];
         end;
         SetLength(BackLinkTemp,0);
         f.Close;
         f.Free;
 
+        Inc(DocumentID, ThisDocCount);
     end;
+
+
+    InitBackLinkValueArray;
 end;
+
 
 
 procedure CheckDataPath;
@@ -1756,14 +1723,6 @@ begin
 	WriteLn('Switching to new index in: ', NewPath);
         if cSData <> '' then
         begin
-            for i := 0 to cDbCount - 1 do
-            begin
-                FreeMem(FilterData[i], FilterDataSize[i]);
-                FreeMem(Values[i], ValueSize[i] * 2);
-                FreeMem(BitField[i], BitFieldSize[i] * 4);
-                FreeMem(TempBitField[i], BitFieldSize[i] * 4);
-            end;
-
             for i := 0 to 63 do
             begin
                 KeyDbs[i].Close;
@@ -1784,6 +1743,7 @@ begin
         LoadCacheData;
     end;
 end;
+
 
 
 function ParseThisParameter(s: string; Default, Min, Max: integer): integer;
@@ -1807,6 +1767,7 @@ begin
 end;
 
 
+
 procedure OpenSnippetDatabases;
 var
     i: integer;
@@ -1816,6 +1777,7 @@ begin
         Html[i] := tFileStream.Create(cSData + 'urls.dat' + IntToStr(i), fmOpenRead or fmShareDenyNone);
     end;
 end;
+
 
 
 procedure CloseSnippetDatabases;
@@ -1829,6 +1791,7 @@ begin
 end;
 
 
+
 procedure EmptyCache;
 var
     i: integer;
@@ -1836,6 +1799,7 @@ begin
     for i := 0 to cMaxCachedResults do
         CacheUsed[i] := false;
 end;
+
 
 
 procedure SetupQuery(Req: TIdHTTPRequestInfo; Res: TIdHTTPResponseInfo);
@@ -1919,13 +1883,19 @@ begin
 
         Ti2 := GetTickCount;
         QueryPass := 1;
+        {$IFNDEF DISABLE_FANCY_HITS}
         FindKeys;
+        {$ENDIF}
         Ti3 := GetTickCount;
+
         Li := tStringList.Create;
         Li.Sorted := false;
         Li.Duplicates := dupAccept;
+
+        {$IFNDEF DISABLE_FANCY_HITS}
         GenResults(Li);
         if ResultCount < 1000 then
+        {$ENDIF}
         begin
             QueryPass := 2;
             FindKeys;
@@ -1970,6 +1940,7 @@ begin
 end;
 
 
+
 procedure ShowAdminRoot(Req: TIdHTTPRequestInfo; Res: TIdHTTPResponseInfo);
 var
   Li: tStringList;
@@ -2009,6 +1980,7 @@ begin
 end;
 
 
+
 procedure tServerObject.IdHTTPServer1CommandGet(AContext: TIdContext;
     ARequestInfo: TIdHTTPRequestInfo;
     AResponseInfo: TIdHTTPResponseInfo);
@@ -2029,6 +2001,7 @@ begin
 end;
 
 
+
 procedure InitServer;
 var
     i: integer;
@@ -2044,7 +2017,6 @@ begin
     Binding := IdHTTPServer1.Bindings.Add;
     Binding.IP := '0.0.0.0';
     Binding.Port := 8081;
-    //IdHTTPServer1.DefaultPort := 8081;
     IdHTTPServer1.OnCommandGet := ServerObject.IdHTTPServer1CommandGet;
 
 
