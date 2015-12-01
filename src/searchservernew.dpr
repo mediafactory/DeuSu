@@ -1156,7 +1156,7 @@ begin
     if FindParam('geronly') <> '' then ThisQuery := ThisQuery + #255 + 'geronly=on';
 
     HashCode := CalcCRC(ThisQuery) and cMaxCachedResults;
-    {$IFNDEF DISABLE_FANCY_HITS}
+    {$IFNDEF DISABLE_RESULT_CACHING}
     if CacheUsed[HashCode] then
     begin
         if CachedResults[HashCode].Query = ThisQuery then
@@ -1401,7 +1401,7 @@ begin
     Li.Add('TotalCount=' + IntToStr(Count));
     if (Count = 0) and (QueryPass = 2) then
     begin
-        Inc(NoResults);
+        if not ThisIsCachedResult then Inc(NoResults);
 
         try
             AssignFile(f, 'noresults.txt');
