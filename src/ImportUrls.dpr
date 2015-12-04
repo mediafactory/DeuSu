@@ -244,6 +244,7 @@ begin
         if (Po = -1) and (Url <> '') and
         (Url[1] <> '/') and (Url[1] >= '1') and
         (Pos('mailto:', sl) = 0) and
+        (Pos('tel:', sl) = 0) and
         (Pos('ftp:', sl) = 0) and
         (Pos('telnet:', sl) = 0) and
         (Pos('news:', sl) = 0) and

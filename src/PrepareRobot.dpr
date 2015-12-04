@@ -342,6 +342,7 @@ begin
             (Pos('hornyhotpanties.com', UrlData.Url) = 0) and
             (Pos('hornyhotpussy.com', UrlData.Url) = 0) and
             (Pos('opera:', Ul) = 0) and
+            (Pos('tel:', Ul) = 0) and
             (Pos('/realmedia/', Ul) = 0) and (copy(Ul, 1, 4) <> 'ftp.') and
             (Pos('.htm/', Ul) = 0) and (Pos('.html/', Ul) = 0) and
             (Pos('/cgi-map/', Ul) = 0) and (Pos('"', Ul) = 0) then
