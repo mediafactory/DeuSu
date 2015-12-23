@@ -8,7 +8,7 @@ rm bin/units/*.ppu
 rm bin/units/*.rst
 set -e
 
-compiler="fpc -Mdelphi -Tlinux -O3 -vew -vq"
+compiler="fpc -Mdelphi -Tlinux -O3 -vewnh"
 compiler=$compiler" -Fusrc/dep/indy10/Lib/*"
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #

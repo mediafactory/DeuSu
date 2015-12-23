@@ -7,7 +7,7 @@
 
 
 @echo off
-set Compiler=fpc -Mdelphi -Twin64 -Px86_64 -O3 -Xs -XX -vew -vq -Fudep\indy10\lib\*
+set Compiler=fpc -Mdelphi -Twin64 -Px86_64 -O3 -Xs -XX -vewnh -Fudep\indy10\lib\*
 Set Compiler=%Compiler% -Fuc:\fpc\2.6.4\units\x86_64-win64\*
 
 
