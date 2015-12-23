@@ -1388,21 +1388,12 @@ begin
     ResultCount := Count;
     Nr := 0;
 
-    Li.Add('corpussize=' + IntToStr(CorpusSize));
-    for i := 1 to KeyWordCount do
-    begin
-        Li.Add('keyword=' + KeyWords[i]);
-        Li.Add('keywordoccurences=' + IntToStr(KeyWordResultCount[i]));
-        Str(log10( 11.0 + (CorpusSize + KeyWordResultCount[i] + 0.5) /
-                     (KeyWordResultCount[i] + 0.5) ):8:6,s);
-        Li.Add('idf=' + s);
-    end;
-
     Li.Add('TotalCount=' + IntToStr(Count));
     if (Count = 0) and (QueryPass = 2) then
     begin
         if not ThisIsCachedResult then Inc(NoResults);
 
+        (*
         try
             AssignFile(f, 'noresults.txt');
             if FileExists('noresults.txt') then Append(f)
@@ -1411,6 +1402,17 @@ begin
             CloseFile(f);
         except
         end;
+        *)
+    end;
+
+    Li.Add('corpussize=' + IntToStr(CorpusSize));
+    for i := 1 to KeyWordCount do
+    begin
+        Li.Add('keyword=' + KeyWords[i]);
+        Li.Add('keywordoccurences=' + IntToStr(KeyWordResultCount[i]));
+        Str(log10( 11.0 + (CorpusSize + KeyWordResultCount[i] + 0.5) /
+                     (KeyWordResultCount[i] + 0.5) ):8:6,s);
+        Li.Add('idf=' + s);
     end;
 
     EndWithNr := StartWithNr + ShowCount - 1;
@@ -1735,9 +1737,9 @@ begin
         for i := 0 to cMaxCachedResults do
             CacheUsed[i] := false;
 
-        Searchs := 0;
-        NoResults := 0;
-        Counter := 0;
+        //Searchs := 0;
+        //NoResults := 0;
+        //Counter := 0;
 
         cSData := NewPath;
         LoadCacheData;
@@ -1903,8 +1905,9 @@ begin
             GenResults(Li);
         end;
 
-        //Res.CharSet := 'text/plain';
-        Res.ContentText := Li.Text;
+        Res.ContentType := 'text/html';
+        Res.CharSet := 'utf-8';
+        Res.ContentText := UTF8Decode(Li.Text);
 
         Li.Free;
         CloseSnippetDatabases;

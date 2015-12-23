@@ -2060,8 +2060,9 @@ begin
             GenResults(Li);
         end;
 
-        //Res.CharSet := 'text/plain';
-        Res.ContentText := Li.Text;
+        Res.ContentType := 'text/html';
+        Res.CharSet := 'utf-8';
+        Res.ContentText := UTF8Decode(Li.Text);
 
         Li.Free;
         CloseSnippetDatabases;
