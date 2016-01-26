@@ -2043,8 +2043,8 @@ begin
             Inc(i);
             FirstPath := ParamStr(i);
             if FirstPath = '' then FirstPath := cSearchFirstPath;
-            if copy(FirstPath,1,Length(FirstPath)) <> '\' then
-                FirstPath := FirstPath + '\';
+            if copy(FirstPath,1,Length(FirstPath)) <> DirectorySeparator then
+                FirstPath := FirstPath + DirectorySeparator;
         end
 
         else if (s = '-path2') or (s='-2') then
@@ -2052,8 +2052,8 @@ begin
             Inc(i);
             SecondPath := ParamStr(i);
             if SecondPath = '' then SecondPath := cSearchSecondPath;
-            if copy(SecondPath,1,Length(SecondPath)) <> '\' then
-                SecondPath := SecondPath + '\';
+            if copy(SecondPath,1,Length(SecondPath)) <> DirectorySeparator then
+                SecondPath := SecondPath + DirectorySeparator;
         end;
 
 
