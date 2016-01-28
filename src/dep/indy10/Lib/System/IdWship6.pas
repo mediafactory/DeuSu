@@ -173,7 +173,13 @@ type
   end;
   {$EXTERNALSYM PSOCKET_SECURITY_SETTINGS_IPSEC}
   PSOCKET_SECURITY_SETTINGS_IPSEC = ^SOCKET_SECURITY_SETTINGS_IPSEC;
-
+  {$EXTERNALSYM SOCKET_SECURITY_SETTINGS}
+  SOCKET_SECURITY_SETTINGS = record
+    SecurityProtocol : SOCKET_SECURITY_PROTOCOL;
+    SecurityFlags : ULONG;
+  end;
+  {$EXTERNALSYM PSOCKET_SECURITY_SETTINGS}
+  PSOCKET_SECURITY_SETTINGS = ^SOCKET_SECURITY_SETTINGS;
   {$EXTERNALSYM SOCKET_PEER_TARGET_NAME}
   SOCKET_PEER_TARGET_NAME = record
     SecurityProtocol : SOCKET_SECURITY_PROTOCOL;
@@ -224,7 +230,7 @@ type
   {$EXTERNALSYM LPFN_FREEADDRINFOW}
   LPFN_FREEADDRINFOW = procedure(ai: PaddrinfoW); stdcall;
 
-//function GetAdaptersAddresses( Family:cardinal; Flags:cardinal; Reserved:pointer; pAdapterAddresses: PIP_ADAPTER_ADDRESSES; pOutBufLen:pcardinal):cardinal;stdcall;  external iphlpapi_dll;
+//function GetAdaptersAddresses( Family:ULONG; Flags:ULONG; Reserved:Pointer; pAdapterAddresses: PIP_ADAPTER_ADDRESSES; pOutBufLen:PULONG):ULONG;stdcall;  external iphlpapi_dll;
 
 { the following are not used, nor tested}
 {function getipnodebyaddr(const src:pointer;  len:integer; af:integer;var error_num:integer) :phostent;stdcall; external Wship6_dll;
@@ -288,6 +294,10 @@ function inet_ntop(af:integer; const src:pointer; dst:pchar;size:integer):pchar;
   {$ENDIF}
 
   //  Fwpuclnt.dll - API
+  {$EXTERNALSYM LPFN_WSASetSocketSecurity}
+  LPFN_WSASetSocketSecurity = function (socket : TSocket;
+    SecuritySettings : PSOCKET_SECURITY_SETTINGS; const SecuritySettingsLen : ULONG;
+    OVERLAPPED : LPWSAOVERLAPPED; CompletionRoutine : LPWSAOVERLAPPED_COMPLETION_ROUTINE) : Integer; stdcall;
   {$EXTERNALSYM LPFN_WSADELETESOCKETPEERTARGETNAME}
   LPFN_WSADELETESOCKETPEERTARGETNAME = function (Socket : TSocket;
     PeerAddr : Psockaddr; PeerAddrLen : ULONG;
@@ -406,6 +416,8 @@ var
   {$ENDIF}
 
   //Fwpuclnt.dll available for Windows Vista and later
+  {$EXTERNALSYM WSASetSocketSecurity}
+  WSASetSocketSecurity : LPFN_WSASetSocketSecurity = nil;
   {$EXTERNALSYM WSASETSOCKETPEERTARGETNAME}
   WSASetSocketPeerTargetName : LPFN_WSASETSOCKETPEERTARGETNAME = nil;
   {$EXTERNALSYM WSADELETESOCKETPEERTARGETNAME}
@@ -1005,7 +1017,7 @@ begin
   // return the binary address.
   //
   if ((pszNodeName = nil) or WspiapiParseV4Address(pszNodeName, dwAddress)) then begin
-    if pszNodeName <> nil then begin
+    if pszNodeName = nil then begin
       dwAddress := htonl(iif((iFlags and AI_PASSIVE) <> 0, INADDR_ANY, INADDR_LOOPBACK));
     end;
 
@@ -1481,10 +1493,13 @@ locations.  hWship6Dll is kept so we can unload the Wship6.dll if necessary.
         hfwpuclntDll := SafeLoadLibrary(fwpuclnt_dll);
         if hfwpuclntDll <> 0 then
         begin
+          WSASetSocketSecurity := GetProcAddress(hfwpuclntDll,
+             'WSASetSocketSecurity');
+          WSAQuerySocketSecurity := GetProcAddress(hfwpuclntDll, 'WSAQuerySocketSecurity'); {Do not localize}
           WSASetSocketPeerTargetName := GetProcAddress(hfwpuclntDll, 'WSASetSocketPeerTargetName'); {Do not localize}
           WSADeleteSocketPeerTargetName := GetProcAddress(hfwpuclntDll, 'WSADeleteSocketPeerTargetName');  {Do not localize}
           WSAImpersonateSocketPeer := GetProcAddress(hfwpuclntDll, 'WSAImpersonateSocketPeer'); {Do not localize}
-          WSAQuerySocketSecurity := GetProcAddress(hfwpuclntDll, 'WSAQuerySocketSecurity'); {Do not localize}
+
           WSARevertImpersonation := GetProcAddress(hfwpuclntDll, 'WSARevertImpersonation'); {Do not localize}
         end;
         {$ENDIF}

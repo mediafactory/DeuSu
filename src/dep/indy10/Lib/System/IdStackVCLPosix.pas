@@ -15,6 +15,7 @@ ways.
 
 {$I IdSymbolPlatformOff.inc}
 {$I IdUnitPlatformOff.inc}
+
 uses
   Classes,
   IdCTypes,
@@ -27,6 +28,12 @@ uses
   IdStackBSDBase;
 
 type
+  {$IFDEF USE_VCL_POSIX}
+    {$IFDEF ANDROID}
+  EIdAccessWifiStatePermissionNeeded = class(EIdAndroidPermissionNeeded);
+  EIdAccessNetworkStatePermissionNeeded = class(EIdAndroidPermissionNeeded);
+    {$ENDIF}
+  {$ENDIF}
 
   TIdSocketListVCLPosix = class (TIdSocketList)
   protected
@@ -37,8 +44,6 @@ type
       AExceptSet: Pfd_set; const ATimeout: Integer): Integer;
     function GetItem(AIndex: Integer): TIdStackSocketHandle; override;
   public
-
-
     procedure Add(AHandle: TIdStackSocketHandle); override;
     procedure Remove(AHandle: TIdStackSocketHandle); override;
     function Count: Integer; override;
@@ -97,17 +102,17 @@ type
     procedure GetSocketName(ASocket: TIdStackSocketHandle; var VIP: string;
      var VPort: TIdPort; var VIPVersion: TIdIPVersion); override;
     procedure Listen(ASocket: TIdStackSocketHandle; ABackLog: Integer); override;
-    function HostToNetwork(AValue: Word): Word; override;
-    function NetworkToHost(AValue: Word): Word; override;
-    function HostToNetwork(AValue: LongWord): LongWord; override;
-    function NetworkToHost(AValue: LongWord): LongWord; override;
-    function HostToNetwork(AValue: Int64): Int64; override;
-    function NetworkToHost(AValue: Int64): Int64; override;
+    function HostToNetwork(AValue: UInt16): UInt16; override;
+    function NetworkToHost(AValue: UInt16): UInt16; override;
+    function HostToNetwork(AValue: UInt32): UInt32; override;
+    function NetworkToHost(AValue: UInt32): UInt32; override;
+    function HostToNetwork(AValue: TIdUInt64): TIdUInt64; override;
+    function NetworkToHost(AValue: TIdUInt64): TIdUInt64; override;
     function RecvFrom(const ASocket: TIdStackSocketHandle;
       var VBuffer; const ALength, AFlags: Integer; var VIP: string;
       var VPort: TIdPort; var VIPVersion: TIdIPVersion): Integer; override;
     function ReceiveMsg(ASocket: TIdStackSocketHandle;
-      var VBuffer: TIdBytes; APkt: TIdPacketInfo): LongWord;  override;
+      var VBuffer: TIdBytes; APkt: TIdPacketInfo): UInt32;  override;
     procedure WSSendTo(ASocket: TIdStackSocketHandle; const ABuffer;
       const ABufferLength, AFlags: Integer; const AIP: string; const APort: TIdPort;
       AIPVersion: TIdIPVersion = ID_DEFAULT_IP_VERSION); override;
@@ -134,8 +139,8 @@ type
     procedure WriteChecksum(s : TIdStackSocketHandle; var VBuffer : TIdBytes;
       const AOffset : Integer; const AIP : String; const APort : TIdPort;
       const AIPVersion: TIdIPVersion = ID_DEFAULT_IP_VERSION); override;
-    function IOControl(const s: TIdStackSocketHandle; const cmd: LongWord;
-      var arg: LongWord): Integer; override;
+    function IOControl(const s: TIdStackSocketHandle; const cmd: UInt32;
+      var arg: UInt32): Integer; override;
 
     procedure GetLocalAddressList(AAddresses: TIdStackLocalAddressList); override;
   end;
@@ -485,7 +490,7 @@ begin
 end;
 
 {$IFDEF HAS_getifaddrs}
-function getifaddrs(ifap: pifaddrs): Integer; cdecl; external libc name _PU + 'getifaddrs'; {do not localize}
+function getifaddrs(var ifap: pifaddrs): Integer; cdecl; external libc name _PU + 'getifaddrs'; {do not localize}
 procedure freeifaddrs(ifap: pifaddrs); cdecl; external libc name _PU + 'freeifaddrs'; {do not localize}
 {$ELSE}
   {$IFDEF ANDROID}
@@ -519,7 +524,7 @@ begin
 
   {$IFDEF HAS_getifaddrs}
 
-  if getifaddrs(@LAddrList) = 0 then // TODO: raise an exception if it fails
+  if getifaddrs(LAddrList) = 0 then // TODO: raise an exception if it fails
   try
     AAddresses.BeginUpdate;
     try
@@ -551,6 +556,80 @@ begin
   end;
 
   {$ELSE}
+
+  // TODO: on Android, either implement getifaddrs() (https://github.com/kmackay/android-ifaddrs)
+  // or use the Java API to enumerate the local network interfaces and their IP addresses, eg:
+  {
+  var
+    en, enumIpAddr: Enumeration;
+    intf: NetworkInterface;
+    inetAddress: InetAddress;
+  begin
+    try
+      en := NetworkInterface.getNetworkInterfaces;
+      if en.hasMoreElements then begin
+        AAddresses.BeginUpdate;
+        try
+          repeat
+            intf := en.nextElement;
+            enumIpAddr := intf.getInetAddresses();
+            while enumIpAddr.hasMoreElements do begin
+              inetAddress := enumIpAddr.nextElement;
+              if not inetAddress.isLoopbackAddress then begin
+                if (inetAddress instanceof Inet4Address) then begin
+                  TIdStackLocalAddressIPv4.Create(AAddresses, inetAddress.getHostAddress.toString, '');
+                end
+                else if (inetAddress instanceof Inet6Address) then begin
+                  TIdStackLocalAddressIPv6.Create(AAddresses, inetAddress.getHostAddress.toString);
+                end;
+              end;
+            end;
+          until not en.hasMoreElements;
+        finally
+          AAddresses.EndUpdate;
+        end;
+       end;
+     except
+       if not HasAndroidPermission('android.permission.INTERNET') then begin
+         IndyRaiseOuterException(EIdInternetPermissionNeeded.CreateError(0, ''));
+       end;
+       if not HasAndroidPermission('android.permission.ACCESS_NETWORK_STATE') then begin
+         IndyRaiseOuterException(EIdAccessNetworkStatePermissionNeeded.CreateError(0, ''));
+       end;
+       raise;
+     end;
+   end;
+
+  Note that this requires the application to have INTERNET and ACCESS_NETWORK_STATE permissions.
+
+  Or:
+
+  uses
+    if XE7+
+      Androidapi.Helpers 
+    else
+      FMX.Helpers.Android 
+    ;
+
+  var
+    wifiManager: WifiManager;
+    ipAddress: Integer;
+  begin
+    try
+      wifiManager := (WifiManager) GetActivityContext.getSystemService(WIFI_SERVICE);
+      ipAddress := wifiManager.getConnectionInfo.getIpAddress;
+    except
+      if not HasAndroidPermission('android.permission.ACCESS_WIFI_STATE') then begin
+        IndyRaiseOuterException(EIdAccessWifiStatePermissionNeeded.CreateError(0, ''));
+      end;
+      raise;
+    end;
+    // WiFiInfo only supports IPv4
+    TIdStackLocalAddressIPv4.Create(AAddresses, Format('%d.%d.%d.%d', [ipAddress and $ff, (ipAddress shr 8) and $ff, (ipAddress shr 16) and $ff, (ipAddress shr 24) and $ff]), '');
+  end;
+
+  This requires only ACCESS_WIFI_STATE permission.
+  }
 
   //IMPORTANT!!!
   //
@@ -646,6 +725,8 @@ function TIdStackVCLPosix.CheckIPVersionSupport(
 var
   LTmpSocket: TIdStackSocketHandle;
 begin
+  // TODO: on nix systems (or maybe just Linux?), an alternative would be to
+  // check for the existance of the '/proc/net/if_inet6' kernel pseudo-file
   LTmpSocket := WSSocket(IdIPFamily[AIPVersion], Id_SOCK_STREAM, Id_IPPROTO_IP );
   Result := LTmpSocket <> Id_INVALID_SOCKET;
   if Result then begin
@@ -900,20 +981,20 @@ begin
   end;
 end;
 
-function TIdStackVCLPosix.HostToNetwork(AValue: LongWord): LongWord;
+function TIdStackVCLPosix.HostToNetwork(AValue: UInt32): UInt32;
 begin
  Result := htonl(AValue);
 end;
 
-function TIdStackVCLPosix.HostToNetwork(AValue: Word): Word;
+function TIdStackVCLPosix.HostToNetwork(AValue: UInt16): UInt16;
 begin
   Result := htons(AValue);
 end;
 
-function TIdStackVCLPosix.HostToNetwork(AValue: Int64): Int64;
+function TIdStackVCLPosix.HostToNetwork(AValue: TIdUInt64): TIdUInt64;
 var
-  LParts: TIdInt64Parts;
-  L: LongWord;
+  LParts: TIdUInt64Parts;
+  L: UInt32;
 begin
   LParts.QuadPart := AValue;
   L := htonl(LParts.HighPart);
@@ -925,7 +1006,7 @@ begin
 end;
 
 function TIdStackVCLPosix.IOControl(const s: TIdStackSocketHandle;
-  const cmd: LongWord; var arg: LongWord): Integer;
+  const cmd: UInt32; var arg: UInt32): Integer;
 begin
   Result := ioctl(s, cmd, @arg);
 end;
@@ -936,15 +1017,15 @@ begin
   CheckForSocketError(Posix.SysSocket.listen(ASocket, ABacklog));
 end;
 
-function TIdStackVCLPosix.NetworkToHost(AValue: LongWord): LongWord;
+function TIdStackVCLPosix.NetworkToHost(AValue: UInt32): UInt32;
 begin
   Result := ntohl(AValue);
 end;
 
-function TIdStackVCLPosix.NetworkToHost(AValue: Int64): Int64;
+function TIdStackVCLPosix.NetworkToHost(AValue: TIdUInt64): TIdUInt64;
 var
-  LParts: TIdInt64Parts;
-  L: LongWord;
+  LParts: TIdUInt64Parts;
+  L: UInt32;
 begin
   LParts.QuadPart := AValue;
   L := ntohl(LParts.HighPart);
@@ -956,7 +1037,7 @@ begin
 
 end;
 
-function TIdStackVCLPosix.NetworkToHost(AValue: Word): Word;
+function TIdStackVCLPosix.NetworkToHost(AValue: UInt16): UInt16;
 begin
    Result := ntohs(AValue);
 end;
@@ -988,7 +1069,7 @@ begin
 end;
 
 function TIdStackVCLPosix.ReceiveMsg(ASocket: TIdStackSocketHandle;
-  var VBuffer: TIdBytes; APkt: TIdPacketInfo): LongWord;
+  var VBuffer: TIdBytes; APkt: TIdPacketInfo): UInt32;
 var
   LSize: socklen_t;
   LAddrStore: sockaddr_storage;
@@ -1120,7 +1201,21 @@ end;
 
 procedure TIdStackVCLPosix.SetBlocking(ASocket: TIdStackSocketHandle;
   const ABlocking: Boolean);
+{
+var
+  LFlags: Integer;
+}
 begin
+  // TODO: enable this
+  {
+  LFlags := CheckForSocketError(Posix.SysSocket.fcntl(ASocket, F_GETFL, 0));
+  if ABlocking then begin
+    LFlags := LFlags and not O_NONBLOCK;
+  end else begin
+    LFlags := LFlags or O_NONBLOCK;
+  end;
+  CheckForSocketError(Posix.SysSocket.fcntl(ASocket, F_SETFL, LFlags));
+  }
   if not ABlocking then begin
     raise EIdNonBlockingNotSupported.Create(RSStackNonBlockingNotSupported);
   end;
@@ -1159,6 +1254,9 @@ function TIdStackVCLPosix.WouldBlock(const AResult: Integer): Boolean;
 begin
   //non-blocking does not exist in Linux, always indicate things will block
   Result := True;
+
+  // TODO: enable this:
+  //Result := CheckForSocketError(AResult, [EAGAIN, EWOULDBLOCK]) <> 0;
 end;
 
 procedure TIdStackVCLPosix.WriteChecksum(s: TIdStackSocketHandle;
@@ -1166,7 +1264,7 @@ procedure TIdStackVCLPosix.WriteChecksum(s: TIdStackSocketHandle;
   const APort: TIdPort; const AIPVersion: TIdIPVersion);
 begin
   case AIPVersion of
-    Id_IPv4 : CopyTIdWord(HostToLittleEndian(CalcCheckSum(VBuffer)), VBuffer, AOffset);
+    Id_IPv4 : CopyTIdUInt16(HostToLittleEndian(CalcCheckSum(VBuffer)), VBuffer, AOffset);
     Id_IPv6 : WriteChecksumIPv6(s, VBuffer, AOffset, AIP, APort);
   else
     IPVersionUnsupported;
@@ -1225,7 +1323,8 @@ begin
       Result := IndyStrToInt(AServiceName);
     except
       on EConvertError do begin
-        raise EIdInvalidServiceName.CreateFmt(RSInvalidServiceName, [AServiceName]);
+        Result := 0;
+        IndyRaiseOuterException(EIdInvalidServiceName.CreateFmt(RSInvalidServiceName, [AServiceName]));
       end;
     end;
   end;
@@ -1235,7 +1334,7 @@ procedure TIdStackVCLPosix.AddServByPortToList(const APortNumber: TIdPort; AAddr
 //function TIdStackVCLPosix.WSGetServByPort(const APortNumber: TIdPort): TStrings;
 type
   PPAnsiCharArray = ^TPAnsiCharArray;
-  TPAnsiCharArray = packed array[0..(MaxLongint div SizeOf(PIdAnsiChar))-1] of PIdAnsiChar;
+  TPAnsiCharArray = packed array[0..(MaxInt div SizeOf(PIdAnsiChar))-1] of PIdAnsiChar;
 var
   Lps: PServEnt;
   Li: Integer;
@@ -1282,6 +1381,7 @@ var
   LAddrIPv6 : sockaddr_in6 absolute LAddrStore;
   LAddr : sockaddr absolute LAddrStore;
   LiSize: socklen_t;
+  LBytesSent: Integer;
 begin
   case AIPVersion of
     Id_IPv4: begin
@@ -1300,9 +1400,9 @@ begin
     LiSize := 0; // avoid warning
     IPVersionUnsupported;
   end;
-  LiSize := Posix.SysSocket.sendto(
+  LBytesSent := Posix.SysSocket.sendto(
     ASocket, ABuffer, ABufferLength, AFlags or Id_MSG_NOSIGNAL, LAddr, LiSize);
-  if LiSize = Id_SOCKET_ERROR then begin
+  if LBytesSent = Id_SOCKET_ERROR then begin
     // TODO: move this into RaiseLastSocketError directly
     if WSGetLastError() = Id_WSAEMSGSIZE then begin
       raise EIdPackageSizeTooBig.Create(RSPackageSizeTooBig);
@@ -1310,7 +1410,7 @@ begin
       RaiseLastSocketError;
     end;
   end
-  else if Integer(LiSize) <> ABufferLength then begin
+  else if LBytesSent <> ABufferLength then begin
     raise EIdNotAllBytesSent.Create(RSNotAllBytesSent);
   end;
 

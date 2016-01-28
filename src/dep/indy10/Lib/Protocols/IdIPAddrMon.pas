@@ -92,6 +92,7 @@ interface
 
 uses
   Classes,
+  IdGlobal,
   IdComponent,
   IdThread;
 
@@ -103,7 +104,7 @@ type
 
   TIdIPAddrMonThread = class(TIdThread)
   protected
-    FInterval: Cardinal;
+    FInterval: UInt32;
     FOnTimerEvent: TNotifyEvent;
 
     procedure Run; override;
@@ -114,7 +115,7 @@ type
   private
     FActive: Boolean;
     FBusy: Boolean;
-    FInterval: Cardinal;
+    FInterval: UInt32;
     FAdapterCount: Integer;
     FThread: TIdIPAddrMonThread;
     // TODO: replace these with TIdStackLocalAddressList
@@ -123,7 +124,7 @@ type
     FOnStatusChanged: TIdIPAddrMonEvent;
 
     procedure SetActive(Value: Boolean);
-    procedure SetInterval(Value: Cardinal);
+    procedure SetInterval(Value: UInt32);
     procedure GetAdapterAddresses;
     procedure DoStatusChanged;
 
@@ -143,7 +144,7 @@ type
 
   published
     property Active: Boolean read FActive write SetActive;
-    property Interval: Cardinal read FInterval write SetInterval default IdIPAddrMonInterval;
+    property Interval: UInt32 read FInterval write SetInterval default IdIPAddrMonInterval;
     property OnStatusChanged: TIdIPAddrMonEvent read FOnStatusChanged write FOnStatusChanged;
   end;
 
@@ -159,7 +160,6 @@ uses
   Posix.SysSelect,
   Posix.SysTime,
   {$ENDIF}
-  IdGlobal,
   IdStack,
   SysUtils;
 
@@ -384,7 +384,7 @@ begin
   end;
 end;
 
-procedure TIdIPAddrMon.SetInterval(Value: Cardinal);
+procedure TIdIPAddrMon.SetInterval(Value: UInt32);
 begin
   FInterval := Value;
   if Assigned(FThread) then begin

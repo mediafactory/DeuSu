@@ -341,10 +341,11 @@ var
   LContentType, LContentTransferEncoding: string;
   LDecoder: TIdDecoder;
   LLine: string;
+  LBinaryLineBreak: string;
   LBuffer: string;  //Needed for binhex4 because cannot decode line-by-line.
   LIsThisTheFirstLine: Boolean; //Needed for binary encoding
-  BoundaryStart, BoundaryEnd: string;
-  IsBinaryContentTransferEncoding: Boolean;
+  LBoundaryStart, LBoundaryEnd: string;
+  LIsBinaryContentTransferEncoding: Boolean;
   LEncoding: IIdTextEncoding;
 begin
   LIsThisTheFirstLine := True;
@@ -400,37 +401,41 @@ begin
     end;
 
     if MIMEBoundary <> '' then begin
-      BoundaryStart := '--' + MIMEBoundary; {Do not Localize}
-      BoundaryEnd := BoundaryStart + '--'; {Do not Localize}
+      LBoundaryStart := '--' + MIMEBoundary; {Do not Localize}
+      LBoundaryEnd := LBoundaryStart + '--'; {Do not Localize}
     end;
 
     if LContentTransferEncoding <> '' then begin
       case PosInStrArray(LContentTransferEncoding, ['7bit', 'quoted-printable', 'base64', '8bit', 'binary'], False) of {do not localize}
-        0..2: IsBinaryContentTransferEncoding := False;
-        3..4: IsBinaryContentTransferEncoding := True;
+        0..2: LIsBinaryContentTransferEncoding := False;
+        3..4: LIsBinaryContentTransferEncoding := True;
       else
         // According to RFC 2045 Section 6.4:
         // "Any entity with an unrecognized Content-Transfer-Encoding must be
         // treated as if it has a Content-Type of "application/octet-stream",
         // regardless of what the Content-Type header field actually says."
-        IsBinaryContentTransferEncoding := True;
+        LIsBinaryContentTransferEncoding := True;
         LContentTransferEncoding := '';
       end;
     end else begin
-      IsBinaryContentTransferEncoding := True;
+      LIsBinaryContentTransferEncoding := True;
     end;
 
     repeat
       if not FProcessFirstLine then begin
-        if IsBinaryContentTransferEncoding then begin
-          //For binary, need EOL because the default LF causes spurious CRs in the output...
+        EnsureEncoding(LEncoding, enc8Bit);
+        if LIsBinaryContentTransferEncoding then begin
+          // For binary, need EOL because the default LF causes spurious CRs in the output...
           // TODO: don't use ReadLnRFC() for binary data at all.  Read into an intermediate
           // buffer instead, looking for the next MIME boundary and message terminator while
-          // flushing the buffer to the destination stream along the way...
-          EnsureEncoding(LEncoding, enc8Bit);
+          // flushing the buffer to the destination stream along the way.  Otherwise, at the
+          // very least, we need to detect the type of line break used (CRLF vs bare-LF) so
+          // we can duplicate it correctly in the output.  Most systems use CRLF, per the RFCs,
+          // but have seen systems use bare-LF instead...
           LLine := ReadLnRFC(VMsgEnd, EOL, '.', LEncoding{$IFDEF STRING_IS_ANSI}, LEncoding{$ENDIF}); {do not localize}
+          LBinaryLineBreak := EOL; // TODO: detect the actual line break used
         end else begin
-          LLine := ReadLnRFC(VMsgEnd);
+          LLine := ReadLnRFC(VMsgEnd, LF, '.', LEncoding{$IFDEF STRING_IS_ANSI}, LEncoding{$ENDIF}); {do not localize}
         end;
       end else begin
         LLine := FFirstLine;
@@ -450,12 +455,12 @@ begin
       end;
       // New boundary - end self and create new coder
       if MIMEBoundary <> '' then begin
-        if TextIsSame(LLine, BoundaryStart) then begin
+        if TextIsSame(LLine, LBoundaryStart) then begin
           Result := TIdMessageDecoderMIME.Create(Owner);
           Break;
           // End of all coders (not quite ALL coders)
         end;
-        if TextIsSame(LLine, BoundaryEnd) then begin
+        if TextIsSame(LLine, LBoundaryEnd) then begin
           // POP the boundary
           if Owner is TIdMessage then begin
             TIdMessage(Owner).MIMEBoundary.Pop;
@@ -465,17 +470,17 @@ begin
       end;
       if LDecoder = nil then begin
         // Data to save, but not decode
-        if IsBinaryContentTransferEncoding then begin {do not localize}
+        if Assigned(ADestStream) then begin
+          EnsureEncoding(LEncoding, enc8Bit);
+        end;
+        if LIsBinaryContentTransferEncoding then begin {do not localize}
           //In this case, we have to make sure we dont write out an EOL at the
           //end of the file.
-          if Assigned(ADestStream) then begin
-            EnsureEncoding(LEncoding, enc8Bit);
-          end;
           if LIsThisTheFirstLine then begin
             LIsThisTheFirstLine := False;
           end else begin
             if Assigned(ADestStream) then begin
-              WriteStringToStream(ADestStream, EOL, LEncoding);
+              WriteStringToStream(ADestStream, LBinaryLineBreak, LEncoding{$IFDEF STRING_IS_ANSI}, LEncoding{$ENDIF});
             end;
           end;
           if Assigned(ADestStream) then begin
@@ -483,21 +488,22 @@ begin
           end;
         end else begin
           if Assigned(ADestStream) then begin
-            WriteStringToStream(ADestStream, LLine + EOL);
+            WriteStringToStream(ADestStream, LLine + EOL, LEncoding{$IFDEF STRING_IS_ANSI}, LEncoding{$ENDIF});
           end;
         end;
       end
       else begin
         // Data to decode
-        // For TIdDecoderQuotedPrintable, we have to make sure all EOLs are
-        // intact
         if LDecoder is TIdDecoderQuotedPrintable then begin
           // For TIdDecoderQuotedPrintable, we have to make sure all EOLs are intact
           LDecoder.Decode(LLine + EOL);
         end else if LDecoder is TIdDecoderBinHex4 then begin
-          //We cannot decode line-by-line because lines don't have a whole
-          //number of 4-byte blocks due to the : inserted at the start of
-          //the first line, so buffer the file...
+          // We cannot decode line-by-line because lines don't have a whole
+          // number of 4-byte blocks due to the : inserted at the start of
+          // the first line, so buffer the file...
+          // TODO: flush the buffer periodically when it has enough blocks
+          // in it, otherwise we are buffering the entire file in memory
+          // before decoding it...
           LBuffer := LBuffer + LLine;
         end else if LLine <> '' then begin
           LDecoder.Decode(LLine);

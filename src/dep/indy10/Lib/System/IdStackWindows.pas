@@ -227,7 +227,7 @@ type
   TIdStackWindows = class(TIdStackBSDBase)
   protected
      procedure WSQuerryIPv6Route(ASocket: TIdStackSocketHandle;
-       const AIP: String; const APort : Word; var VSource; var VDest);
+       const AIP: String; const APort : UInt16; var VSource; var VDest);
     procedure WriteChecksumIPv6(s : TIdStackSocketHandle; var VBuffer : TIdBytes;
       const AOffset : Integer; const AIP : String; const APort : TIdPort);
     function HostByName(const AHostName: string;
@@ -248,13 +248,13 @@ type
   public
     function Accept(ASocket: TIdStackSocketHandle; var VIP: string; var VPort: TIdPort;
       var VIPVersion: TIdIPVersion): TIdStackSocketHandle; override;
-    function HostToNetwork(AValue: Word): Word; override;
-    function HostToNetwork(AValue: LongWord): LongWord; override;
-    function HostToNetwork(AValue: Int64): Int64; override;
+    function HostToNetwork(AValue: UInt16): UInt16; override;
+    function HostToNetwork(AValue: UInt32): UInt32; override;
+    function HostToNetwork(AValue: TIdUInt64): TIdUInt64; override;
     procedure Listen(ASocket: TIdStackSocketHandle; ABackLog: Integer); override;
-    function NetworkToHost(AValue: Word): Word; override;
-    function NetworkToHost(AValue: LongWord): LongWord; override;
-    function NetworkToHost(AValue: Int64): Int64; override;
+    function NetworkToHost(AValue: UInt16): UInt16; override;
+    function NetworkToHost(AValue: UInt32): UInt32; override;
+    function NetworkToHost(AValue: TIdUInt64): TIdUInt64; override;
     procedure SetBlocking(ASocket: TIdStackSocketHandle; const ABlocking: Boolean); override;
     function WouldBlock(const AResult: Integer): Boolean; override;
     //
@@ -268,7 +268,7 @@ type
      const ALength, AFlags: Integer; var VIP: string; var VPort: TIdPort;
      var VIPVersion: TIdIPVersion): Integer; override;
    function ReceiveMsg(ASocket: TIdStackSocketHandle; var VBuffer: TIdBytes;
-      APkt : TIdPacketInfo): LongWord; override;
+      APkt : TIdPacketInfo): UInt32; override;
 
     procedure WSSendTo(ASocket: TIdStackSocketHandle; const ABuffer;
       const ABufferLength, AFlags: Integer; const AIP: string; const APort: TIdPort; AIPVersion: TIdIPVersion = ID_DEFAULT_IP_VERSION); override;
@@ -296,7 +296,7 @@ type
     procedure SetSocketOption(ASocket: TIdStackSocketHandle; ALevel: TIdSocketOptionLevel;
       AOptName: TIdSocketOption; const AOptVal; const AOptLen: Integer); override;
     {$ENDIF}
-    function IOControl(const s:  TIdStackSocketHandle; const cmd: LongWord; var arg: LongWord): Integer; override;
+    function IOControl(const s:  TIdStackSocketHandle; const cmd: UInt32; var arg: UInt32): Integer; override;
     function SupportsIPv6: Boolean; override;
     function CheckIPVersionSupport(const AIPVersion: TIdIPVersion): boolean; override;
     procedure WriteChecksum(s : TIdStackSocketHandle;
@@ -839,7 +839,7 @@ begin
       {$ENDIF}
     except
       on E: Exception do begin
-        raise EIdStackInitializationFailed.Create(E.Message);
+        IndyRaiseOuterException(EIdStackInitializationFailed.Create(E.Message));
       end;
     end;
     GStarted := True;
@@ -1137,7 +1137,8 @@ begin
       Result := IndyStrToInt(AServiceName);
     except
       on EConvertError do begin
-        raise EIdInvalidServiceName.CreateFmt(RSInvalidServiceName, [AServiceName]);
+        Result := 0;
+        IndyRaiseOuterException(EIdInvalidServiceName.CreateFmt(RSInvalidServiceName, [AServiceName]));
       end;
     end;
   end;
@@ -1147,7 +1148,7 @@ procedure TIdStackWindows.AddServByPortToList(const APortNumber: TIdPort; AAddre
 type
   // Note that there is no Unicode version of getservbyport.
   PPAnsiCharArray = ^TPAnsiCharArray;
-  TPAnsiCharArray = packed array[0..(MaxLongint div SizeOf(PAnsiChar))-1] of PAnsiChar;
+  TPAnsiCharArray = packed array[0..(MaxInt div SizeOf(PAnsiChar))-1] of PAnsiChar;
 var
   ps: PServEnt;
   i: integer;
@@ -1175,48 +1176,48 @@ begin
   end;
 end;
 
-function TIdStackWindows.HostToNetwork(AValue: Word): Word;
+function TIdStackWindows.HostToNetwork(AValue: UInt16): UInt16;
 begin
   Result := htons(AValue);
 end;
 
-function TIdStackWindows.NetworkToHost(AValue: Word): Word;
+function TIdStackWindows.NetworkToHost(AValue: UInt16): UInt16;
 begin
   Result := ntohs(AValue);
 end;
 
-function TIdStackWindows.HostToNetwork(AValue: LongWord): LongWord;
+function TIdStackWindows.HostToNetwork(AValue: UInt32): UInt32;
 begin
   Result := htonl(AValue);
 end;
 
-function TIdStackWindows.NetworkToHost(AValue: LongWord): LongWord;
+function TIdStackWindows.NetworkToHost(AValue: UInt32): UInt32;
 begin
   Result := ntohl(AValue);
 end;
 
-function TIdStackWindows.HostToNetwork(AValue: Int64): Int64;
+function TIdStackWindows.HostToNetwork(AValue: TIdUInt64): TIdUInt64;
 var
-  LParts: TIdInt64Parts;
-  L: LongWord;
+  LParts: TIdUInt64Parts;
+  L: UInt32;
 begin
-  LParts.QuadPart := AValue;
+  LParts.QuadPart := AValue{$IFDEF TIdUInt64_IS_NOT_NATIVE}.QuadPart{$ENDIF};
   L := htonl(LParts.HighPart);
   LParts.HighPart := htonl(LParts.LowPart);
   LParts.LowPart := L;
-  Result := LParts.QuadPart;
+  Result{$IFDEF TIdUInt64_IS_NOT_NATIVE}.QuadPart{$ENDIF} := LParts.QuadPart;
 end;
 
-function TIdStackWindows.NetworkToHost(AValue: Int64): Int64;
+function TIdStackWindows.NetworkToHost(AValue: TIdUInt64): TIdUInt64;
 var
-  LParts: TIdInt64Parts;
-  L: LongWord;
+  LParts: TIdUInt64Parts;
+  L: UInt32;
 begin
-  LParts.QuadPart := AValue;
+  LParts.QuadPart := AValue{$IFDEF TIdUInt64_IS_NOT_NATIVE}.QuadPart{$ENDIF};
   L := ntohl(LParts.HighPart);
   LParts.HighPart := ntohl(LParts.LowPart);
   LParts.LowPart := L;
-  Result := LParts.QuadPart;
+  Result{$IFDEF TIdUInt64_IS_NOT_NATIVE}.QuadPart{$ENDIF} := LParts.QuadPart;
 end;
 
 procedure TIdStackWindows.GetLocalAddressList(AAddresses: TIdStackLocalAddressList);
@@ -1255,6 +1256,8 @@ type
     Table := nil;
     try
       repeat
+        // Alternatively, use WSAIoctl(SIO_GET_INTERFACE_LIST), but
+        // I have noticed it does not always return IPv4 subnets!
         Ret := GetIpAddrTable(Table, BufLen, FALSE);
         case Ret of
           ERROR_SUCCESS:
@@ -1314,6 +1317,7 @@ type
     GetMem(Adapters, BufLen);
     try
       repeat
+        // TODO: include GAA_FLAG_INCLUDE_PREFIX on XPSP1+?
         // TODO: include GAA_FLAG_INCLUDE_ALL_INTERFACES on Vista+?
         Ret := GetAdaptersAddresses(PF_UNSPEC, GAA_FLAG_SKIP_ANYCAST or GAA_FLAG_SKIP_MULTICAST or GAA_FLAG_SKIP_DNS_SERVER or GAA_FLAG_SKIP_FRIENDLY_NAME, nil, Adapters, BufLen);
         case Ret of
@@ -1367,6 +1371,9 @@ type
                           SubNetStr := IPv4MaskLengthToString(UnicastAddr^.OnLinkPrefixLength);
                         end else
                         begin
+                          // TODO: on XP SP1+, can the subnet mask be determined
+                          // by analyzing the Adapter's Prefix list without resorting
+                          // to reading the Registry?
                           if SubNetMasks = nil then
                           begin
                             SubNetMasks := TStringList.Create;
@@ -1530,7 +1537,7 @@ type
     end;
   end;
 
-  {$ELSE}
+    {$ELSE}
 
 var
     {$IFDEF UNICODE}
@@ -1692,8 +1699,8 @@ begin
   Result := 0;
   Lock;
   try
-    //We can't redefine AIndex to be a LongWord because the libc Interface
-    //and DotNET define it as a LongInt.  OS/2 defines it as a Word.
+    //We can't redefine AIndex to be a UInt32 because the libc Interface
+    //and DotNET define it as a LongInt.  OS/2 defines it as a UInt16.
     if (AIndex >= 0) and (u_int(AIndex) < FFDSet.fd_count) then begin
       Result := FFDSet.fd_array[AIndex];
     end else begin
@@ -1851,9 +1858,9 @@ end;
 procedure TIdStackWindows.SetBlocking(ASocket: TIdStackSocketHandle;
   const ABlocking: Boolean);
 var
-  LValue: LongWord;
+  LValue: UInt32;
 begin
-  LValue := LongWord(not ABlocking);
+  LValue := UInt32(not ABlocking);
   CheckForSocketError(ioctlsocket(ASocket, FIONBIO, LValue));
 end;
 
@@ -2043,40 +2050,49 @@ http://groups.google.com/groups?q=Winsock2+Delphi+protocol&hl=en&lr=&ie=UTF-8&oe
 }
 function TIdStackWindows.SupportsIPv6: Boolean;
 var
-  LLen : LongWord;
+  LLen : DWORD;
   LPInfo, LPCurPtr: LPWSAPROTOCOL_INFO;
   LCount : Integer;
   i : Integer;
 begin
   Result := False;
-  LLen := 0;
-  // Note: WSAEnumProtocols returns -1 when it is just called to get the needed Buffer Size!
-  if (IdWinsock2.WSAEnumProtocols(nil, nil, LLen) = SOCKET_ERROR) and (LLen > 0) then
-  begin
-    GetMem(LPInfo, LLen);
-    try
+  LPInfo := nil;
+  try
+    LLen := 0;
+    // Note: WSAEnumProtocols returns -1 when it is just called to get the needed Buffer Size!
+    repeat
       LCount := IdWinsock2.WSAEnumProtocols(nil, LPInfo, LLen);
-      if LCount > 0 then
+      if LCount = SOCKET_ERROR then
       begin
-        LPCurPtr := LPInfo;
-        for i := 0 to LCount-1 do
-        begin
-          if LPCurPtr^.iAddressFamily = PF_INET6 then
-          begin
-            Result := True;
-            Break;
-          end;
-          Inc(LPCurPtr);
+        if WSAGetLastError() <> WSAENOBUFS then begin
+          Exit;
         end;
+        ReallocMem(LPInfo, LLen);
+      end else begin
+        Break;
       end;
-    finally
-      FreeMem(LPInfo);
+    until False;
+
+    if LCount > 0 then
+    begin
+      LPCurPtr := LPInfo;
+      for i := 0 to LCount-1 do
+      begin
+        if LPCurPtr^.iAddressFamily = AF_INET6 then
+        begin
+          Result := True;
+          Exit;
+        end;
+        Inc(LPCurPtr);
+      end;
     end;
+  finally
+    FreeMem(LPInfo);
   end;
 end;
 
 function TIdStackWindows.IOControl(const s: TIdStackSocketHandle;
-  const cmd: LongWord; var arg: LongWord): Integer;
+  const cmd: UInt32; var arg: UInt32): Integer;
 begin
   Result := IdWinsock2.ioctlsocket(s, cmd, arg);
 end;
@@ -2086,7 +2102,7 @@ procedure TIdStackWindows.WSQuerryIPv6Route(ASocket: TIdStackSocketHandle;
 var
   Llocalif : TSockAddrIn6;
   LAddr : TSockAddrIn6;
-  Bytes : LongWord;
+  Bytes : DWORD;
 begin
   //make our LAddrInfo structure
   FillChar(LAddr, SizeOf(LAddr), 0);
@@ -2106,7 +2122,7 @@ procedure TIdStackWindows.WriteChecksum(s: TIdStackSocketHandle;
   const APort: TIdPort; const AIPVersion: TIdIPVersion);
 begin
   case AIPVersion of
-    Id_IPv4 : CopyTIdWord(HostToLittleEndian(CalcCheckSum(VBuffer)), VBuffer, AOffset);
+    Id_IPv4 : CopyTIdUInt16(HostToLittleEndian(CalcCheckSum(VBuffer)), VBuffer, AOffset);
     Id_IPv6 : WriteChecksumIPv6(s, VBuffer, AOffset, AIP, APort);
   else
     IPVersionUnsupported;
@@ -2121,7 +2137,7 @@ var
   LDest : TIdIn6Addr;
   LTmp : TIdBytes;
   LIdx : Integer;
-  LC : LongWord;
+  LC : UInt32;
 {
    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
    |                                                               |
@@ -2156,8 +2172,8 @@ begin
   Move(LDest, LTmp[LIdx], SIZE_TSOCKADDRIN6);
   Inc(LIdx, SIZE_TSOCKADDRIN6);
   //use a word so you don't wind up using the wrong network byte order function
-  LC := LongWord(Length(VBuffer));
-  CopyTIdLongWord(HostToNetwork(LC), LTmp, LIdx);
+  LC := UInt32(Length(VBuffer));
+  CopyTIdUInt32(HostToNetwork(LC), LTmp, LIdx);
   Inc(LIdx, 4);
   //36
   //zero the next three bytes
@@ -2169,13 +2185,13 @@ begin
   //combine the two
   CopyTIdBytes(VBuffer, 0, LTmp, LIdx, Length(VBuffer));
   //zero out the checksum field
-  CopyTIdWord(0, LTmp, LIdx+AOffset);
+  CopyTIdUInt16(0, LTmp, LIdx+AOffset);
 
-  CopyTIdWord(HostToLittleEndian(CalcCheckSum(LTmp)), VBuffer, AOffset);
+  CopyTIdUInt16(HostToLittleEndian(CalcCheckSum(LTmp)), VBuffer, AOffset);
 end;
 
 function TIdStackWindows.ReceiveMsg(ASocket: TIdStackSocketHandle; var VBuffer : TIdBytes;
-  APkt: TIdPacketInfo): LongWord;
+  APkt: TIdPacketInfo): UInt32;
 var
   LIP : String;
   LPort : TIdPort;
@@ -2352,9 +2368,13 @@ end;
 procedure TIdStackWindows.SetKeepAliveValues(ASocket: TIdStackSocketHandle;
   const AEnabled: Boolean; const ATimeMS, AInterval: Integer);
 var
-  ka: tcp_keepalive;
+  ka: _tcp_keepalive;
   Bytes: DWORD;
 begin
+  // TODO: instead of doing an OS version check, always call SIO_KEEPALIVE_VALS
+  // when AEnabled is True, and then fallback to SO_KEEPALIVE if WSAIoctl()
+  // reports that SIO_KEEPALIVE_VALS is not supported...
+
   // SIO_KEEPALIVE_VALS is supported on Win2K+ and WinCE 4.x only
   if AEnabled and IndyCheckWindowsVersion({$IFDEF WINCE}4{$ELSE}5{$ENDIF}) then
   begin

@@ -562,11 +562,7 @@ begin
       Exit;
     end;
   end;
-  if ReceiveStream <> nil then begin
-    Result := not FTerminatorWasRead;
-  end else begin
-    Result := False;
-  end;
+  Result := ReceiveStream <> nil;
 end;
 
 function TIdIOHandlerStreamMsg.ReadDataFromSource(var VBuffer: TIdBytes): Integer;
@@ -599,7 +595,7 @@ begin
     // instead of ASCII...
     CopyTIdString(LTerminator, VBuffer, 0);
     Result := Length(LTerminator);
-  end else begin;
+  end else begin
     Result := 0;
   end;
 end;
@@ -701,21 +697,18 @@ var
   LUnknownContentTransferEncoding: Boolean;
 
   // TODO - move this procedure into TIdIOHandler as a new Capture method?
-  procedure CaptureAndDecodeCharset(AByteEncoding: IIdTextEncoding);
+  procedure CaptureAndDecodeCharset;
   var
     LMStream: TMemoryStream;
-    {$IFDEF STRING_IS_ANSI}
-    LAnsiEncoding: IIdTextEncoding;
-    {$ENDIF}
   begin
     LMStream := TMemoryStream.Create;
     try
-      IOHandler.Capture(LMStream, ADelim, True, AByteEncoding{$IFDEF STRING_IS_ANSI}, AByteEncoding{$ENDIF});
+      IOHandler.Capture(LMStream, ADelim, True, IndyTextEncoding_8Bit{$IFDEF STRING_IS_ANSI}, IndyTextEncoding_8Bit{$ENDIF});
       LMStream.Position := 0;
-      {$IFDEF STRING_IS_ANSI}
-      LAnsiEncoding := CharsetToEncoding(AMsg.CharSet);
-      {$ENDIF}
-      ReadStringsAsCharSet(LMStream, AMsg.Body, AMsg.CharSet{$IFDEF STRING_IS_ANSI}, LAnsiEncoding{$ENDIF});
+      // TODO: when String is AnsiString, TIdIMAP4 uses 8bit as the destination
+      // encoding, should this be doing the same? Otherwise, we could just use
+      // AMsg.Body.LoadFromStream() instead...
+      ReadStringsAsCharSet(LMStream, AMsg.Body, AMsg.CharSet{$IFDEF STRING_IS_ANSI}, CharsetToEncoding(AMsg.CharSet){$ENDIF});
     finally
       FreeAndNil(LMStream);
     end;
@@ -748,9 +741,6 @@ var
     LNewDecoder: TIdMessageDecoder;
     {$IFDEF STRING_IS_ANSI}
     LAnsiEncoding: IIdTextEncoding;
-    {$ENDIF}
-    {$IFNDEF HAS_TStrings_ValueFromIndex}
-    LTmp: string;
     {$ENDIF}
   begin
     LMStream := TMemoryStream.Create;
@@ -789,16 +779,9 @@ var
             if not AMsg.IsMsgSinglePartMime then begin
               for i := 0 to VDecoder.Headers.Count-1 do begin
                 if LTxt.Headers.IndexOfName(VDecoder.Headers.Names[i]) < 0 then begin
-                  {$IFNDEF HAS_TStrings_ValueFromIndex}
-                  LTmp := VDecoder.Headers.Strings[i];
-                  {$ENDIF}
                   LTxt.ExtraHeaders.AddValue(
                     VDecoder.Headers.Names[i],
-                    {$IFDEF HAS_TStrings_ValueFromIndex}
-                    VDecoder.Headers.ValueFromIndex[i]
-                    {$ELSE}
-                    Copy(LTmp, Pos('=', LTmp)+1, MaxInt) {do not localize}
-                    {$ENDIF}
+                    IndyValueFromIndex(VDecoder.Headers, i)
                   );
                 end;
               end;
@@ -847,9 +830,6 @@ var
     i: integer;
     LAttachment: TIdAttachment;
     LNewDecoder: TIdMessageDecoder;
-    {$IFNDEF HAS_TStrings_ValueFromIndex}
-    LTmp: String;
-    {$ENDIF}
   begin
     LParentPart := AMsg.MIMEBoundary.ParentPart;
     AMsg.DoCreateAttachment(VDecoder.Headers, LAttachment);
@@ -883,16 +863,9 @@ var
         if not AMsg.IsMsgSinglePartMime then begin
           for i := 0 to VDecoder.Headers.Count-1 do begin
             if LAttachment.Headers.IndexOfName(VDecoder.Headers.Names[i]) < 0 then begin
-              {$IFNDEF HAS_TStrings_ValueFromIndex}
-              LTmp := VDecoder.Headers.Strings[i];
-              {$ENDIF}
               LAttachment.ExtraHeaders.AddValue(
                 VDecoder.Headers.Names[i],
-                {$IFDEF HAS_TStrings_ValueFromIndex}
-                VDecoder.Headers.ValueFromIndex[i]
-                {$ELSE}
-                Copy(LTmp, Pos('=', LTmp)+1, MaxInt) {do not localize}
-                {$ENDIF}
+                IndyValueFromIndex(VDecoder.Headers, i)
               );
             end;
           end;
@@ -942,58 +915,63 @@ begin
   // the user could be allowed to set up the IOHandler.DefStringEncoding
   // beforehand?
 
-  LContentTransferEncoding := AMsg.ContentTransferEncoding;
   LUnknownContentTransferEncoding := False;
 
-  if LContentTransferEncoding = '' then begin
-    // RLebeau 04/08/2014: According to RFC 2045 Section 6.1:
-    // "Content-Transfer-Encoding: 7BIT" is assumed if the
-    // Content-Transfer-Encoding header field is not present."
-    if IsHeaderMediaType(AMsg.ContentType, 'application/mac-binhex40') then begin  {Do not Localize}
-      LContentTransferEncoding := 'binhex40'; {do not localize}
-    end
-    else if (AMsg.Encoding = meMIME) and (AMsg.MIMEBoundary.Count > 0) and (not AMsg.NoDecode) then begin
-      LContentTransferEncoding := '7bit'; {do not localize}
-    end;
-  end
-  else if IsHeaderMediaType(AMsg.ContentType, 'multipart') then {do not localize}
-  begin
-    // RLebeau 08/17/09 - According to RFC 2045 Section 6.4:
-    // "If an entity is of type "multipart" the Content-Transfer-Encoding is not
-    // permitted to have any value other than "7bit", "8bit" or "binary"."
-    //
-    // However, came across one message where the "Content-Type" was set to
-    // "multipart/related" and the "Content-Transfer-Encoding" was set to
-    // "quoted-printable".  Outlook and Thunderbird were apparently able to parse
-    // the message correctly, but Indy was not.  So let's check for that scenario
-    // and ignore illegal "Content-Transfer-Encoding" values if present...
-    if PosInStrArray(LContentTransferEncoding, ['7bit', '8bit', 'binary'], False) = -1 then begin {do not localize}
-      LContentTransferEncoding := '';
-      //LUnknownContentTransferEncoding := True;
-    end;
-  end;
-
-  if LContentTransferEncoding <> '' then begin
-    case PosInStrArray(LContentTransferEncoding, ['7bit', 'quoted-printable', 'base64', '8bit', 'binary'], False) of {do not localize}
-      0..2: LEncoding := IndyTextEncoding_ASCII;
-      3..4: LEncoding := IndyTextEncoding_8Bit;
-    else
-      // According to RFC 2045 Section 6.4:
-      // "Any entity with an unrecognized Content-Transfer-Encoding must be
-      // treated as if it has a Content-Type of "application/octet-stream",
-      // regardless of what the Content-Type header field actually says."
-      LEncoding := IndyTextEncoding_8Bit;
-      LContentTransferEncoding := '';
-      LUnknownContentTransferEncoding := True;
-    end;
-  end else begin
+  if AMsg.NoDecode then begin
     LEncoding := IndyTextEncoding_8Bit;
+  end else
+  begin
+    LContentTransferEncoding := AMsg.ContentTransferEncoding;
+    if LContentTransferEncoding = '' then begin
+      // RLebeau 04/08/2014: According to RFC 2045 Section 6.1:
+      // "Content-Transfer-Encoding: 7BIT" is assumed if the
+      // Content-Transfer-Encoding header field is not present."
+      if IsHeaderMediaType(AMsg.ContentType, 'application/mac-binhex40') then begin  {Do not Localize}
+        LContentTransferEncoding := 'binhex40'; {do not localize}
+      end
+      else if (AMsg.Encoding = meMIME) and (AMsg.MIMEBoundary.Count > 0) then begin
+        LContentTransferEncoding := '7bit'; {do not localize}
+      end;
+    end
+    else if IsHeaderMediaType(AMsg.ContentType, 'multipart') then {do not localize}
+    begin
+      // RLebeau 08/17/09 - According to RFC 2045 Section 6.4:
+      // "If an entity is of type "multipart" the Content-Transfer-Encoding is not
+      // permitted to have any value other than "7bit", "8bit" or "binary"."
+      //
+      // However, came across one message where the "Content-Type" was set to
+      // "multipart/related" and the "Content-Transfer-Encoding" was set to
+      // "quoted-printable".  Outlook and Thunderbird were apparently able to parse
+      // the message correctly, but Indy was not.  So let's check for that scenario
+      // and ignore illegal "Content-Transfer-Encoding" values if present...
+      if PosInStrArray(LContentTransferEncoding, ['7bit', '8bit', 'binary'], False) = -1 then begin {do not localize}
+        LContentTransferEncoding := '';
+        //LUnknownContentTransferEncoding := True;
+      end;
+    end;
+
+    if LContentTransferEncoding <> '' then begin
+      case PosInStrArray(LContentTransferEncoding, ['7bit', 'quoted-printable', 'base64', '8bit', 'binary'], False) of {do not localize}
+        0..2: LEncoding := IndyTextEncoding_ASCII;
+        3..4: LEncoding := IndyTextEncoding_8Bit;
+      else
+        // According to RFC 2045 Section 6.4:
+        // "Any entity with an unrecognized Content-Transfer-Encoding must be
+        // treated as if it has a Content-Type of "application/octet-stream",
+        // regardless of what the Content-Type header field actually says."
+        LEncoding := IndyTextEncoding_8Bit;
+        LContentTransferEncoding := '';
+        LUnknownContentTransferEncoding := True;
+      end;
+    end else begin
+      LEncoding := IndyTextEncoding_8Bit;
+    end;
   end;
 
   BeginWork(wmRead);
   try
     if AMsg.NoDecode then begin
-      CaptureAndDecodeCharset(LEncoding);
+      CaptureAndDecodeCharset;
     end else begin
       LActiveDecoder := nil;
       try
@@ -1013,7 +991,18 @@ begin
             // and charset encoding together!  Need to read the raw bytes into
             // an intermediate buffer of some kind using the transfer encoding,
             // and then decode the characters using the charset afterwards...
-            LLine := IOHandler.ReadLnRFC(LMsgEnd, LF, ADelim, LCharsetEncoding{$IFDEF STRING_IS_ANSI}, LCharsetEncoding{$ENDIF});
+            //
+            // Need to do this anyway because ReadLnRFC() processes the LF and
+            // ADelim values in terms of the charset specified, which is wrong.
+            // EBCDIC-based charsets totally break that logic! For example, cp1026
+            // converts #10 (LF) to $25 instead of $0A during encoding, and converts
+            // $0A (LF) and $2E ('.') to #$83 and #6 during decoding, etc. And what
+            // if the charset is UTF-16 instead?  So we need to read raw bytes into
+            // a buffer, checking it for handling of line breaks, dot-transparency,
+            // and message termination, and THEN decode whatever is left using the
+            // charset...
+
+            LLine := IOHandler.ReadLnRFC(LMsgEnd, LF, ADelim, IndyTextEncoding_8Bit{$IFDEF STRING_IS_ANSI}, IndyTextEncoding_8Bit{$ENDIF});
             if LMsgEnd then begin
               Break;
             end;
@@ -1022,6 +1011,7 @@ begin
             end;
             // Check again, the if above can set it.
             if LActiveDecoder = nil then begin
+              LLine := LCharsetEncoding.GetString(ToBytes(LLine, IndyTextEncoding_8Bit{$IFDEF STRING_IS_ANSI}, IndyTextEncoding_8Bit{$ENDIF}));
               AMsg.Body.Add(LLine);
             end else begin
               RemoveLastBlankLine(AMsg.Body);

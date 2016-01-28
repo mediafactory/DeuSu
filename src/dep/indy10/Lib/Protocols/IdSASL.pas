@@ -54,10 +54,12 @@ from the UserPass mechanism and link to a UserPass provider.
 unit IdSASL;
 
 interface
+
 {$i IdCompilerDefines.inc}
 
 uses
   Classes,
+  IdGlobal,
   IdBaseComponent,
   IdTCPConnection,
   IdException;
@@ -68,8 +70,8 @@ type
 
   TIdSASL = class(TIdBaseComponent)
   protected
-    FSecurityLevel : Cardinal;
-    function GetSecurityLevel : Cardinal;
+    FSecurityLevel : UInt32;
+    function GetSecurityLevel : UInt32;
     procedure InitComponent; override;
   public
     destructor Destroy; override;
@@ -117,7 +119,7 @@ type
       to honour it or not. I suggest the mechanisms are tried in order,
       higher security level first.
     }
-    property SecurityLevel : Cardinal read GetSecurityLevel;
+    property SecurityLevel : UInt32 read GetSecurityLevel;
 
     {
       Returns the service name of the descendant class,
@@ -140,7 +142,7 @@ uses
   {$IFDEF VCL_XE3_OR_ABOVE}
   System.Types,
   {$ENDIF}
-  IdGlobal, SysUtils;
+  SysUtils;
 
 { TIdSASL }
 
@@ -171,7 +173,7 @@ begin
   // do nothing, deliberately
 end;
 
-function TIdSASL.GetSecurityLevel: Cardinal;
+function TIdSASL.GetSecurityLevel: UInt32;
 begin
   Result := FSecurityLevel;
 end;

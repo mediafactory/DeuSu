@@ -5,6 +5,7 @@ interface
 {$i IdCompilerDefines.inc}
 
 uses
+  IdGlobal,
   IdSASL,
   IdSASLUserPass;
 
@@ -15,7 +16,7 @@ type
   TIdSASLNTLM = class(TIdSASLUserPass)
   protected
     FDomain : String;
-    FLMCompatibility : LongWord;
+    FLMCompatibility : UInt32;
     procedure InitComponent; override;
   public
     class function ServiceName: TIdSASLServiceName; override;
@@ -45,13 +46,13 @@ Level        |	Sent by Client               |	Accepted by Server
 5            | LMv2 NTLMv2                   | LMv2 NTLMv2
 
 }
-    property LMCompatibility : LongWord read FLMCompatibility write FLMCompatibility default DEF_LMCompatibility;
+    property LMCompatibility : UInt32 read FLMCompatibility write FLMCompatibility default DEF_LMCompatibility;
   end;
 
 implementation
 
 uses
-  IdFIPS, IdNTLMv2, IdGlobal;
+  IdFIPS, IdNTLMv2;
   
 //uses IdNTLM;
 
@@ -63,7 +64,7 @@ var
   LMsg : TIdBytes;
   LNonce : TIdBytes; //this is also called the challange
   LTargetName, LTargetInfo : TIdBytes;
-  LFlags : LongWord;
+  LFlags : UInt32;
   LDomain, LUserName : String;
   LEncoding: IIdTextEncoding;
 begin

@@ -395,7 +395,8 @@ type
   function ABNFToText(const AText : String) : String;
   function BinStrToInt(const ABinary: String): Integer;
   function BreakApart(BaseString, BreakString: string; StringList: TStrings): TStrings;
-  function LongWordToFourChar(AValue : LongWord): string;
+  function UInt32ToFourChar(AValue : UInt32): string;
+  function LongWordToFourChar(AValue : UInt32): string; {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use UInt32ToFourChar()'{$ENDIF};{$ENDIF}
   function CharRange(const AMin, AMax : Char): String;
   procedure CommaSeparatedToStringList(AList: TStrings; const Value:string);
   function CompareDateTime(const ADateTime1, ADateTime2 : TDateTime) : Integer;
@@ -438,14 +439,16 @@ type
   (probably some other protocols).  They aren't aren't in IdGlobals because that
   doesn't refer to IdStack so you can't use GStack there.
   }
-  procedure CopyBytesToHostLongWord(const ASource : TIdBytes; const ASourceIndex: Integer;
-    var VDest : LongWord);
-  procedure CopyBytesToHostWord(const ASource : TIdBytes; const ASourceIndex: Integer;
-    var VDest : Word);
-  procedure CopyTIdNetworkLongWord(const ASource: LongWord;
-    var VDest: TIdBytes; const ADestIndex: Integer);
-  procedure CopyTIdNetworkWord(const ASource: Word;
-    var VDest: TIdBytes; const ADestIndex: Integer);
+  procedure CopyBytesToHostUInt32(const ASource : TIdBytes; const ASourceIndex: Integer; var VDest : UInt32);
+  procedure CopyBytesToHostUInt16(const ASource : TIdBytes; const ASourceIndex: Integer; var VDest : UInt16);
+  procedure CopyTIdNetworkUInt32(const ASource: UInt32; var VDest: TIdBytes; const ADestIndex: Integer);
+  procedure CopyTIdNetworkUInt16(const ASource: UInt16; var VDest: TIdBytes; const ADestIndex: Integer);
+
+  procedure CopyBytesToHostLongWord(const ASource : TIdBytes; const ASourceIndex: Integer; var VDest : UInt32); {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use CopyBytesToHostUInt32'{$ENDIF};{$ENDIF}
+  procedure CopyBytesToHostWord(const ASource : TIdBytes; const ASourceIndex: Integer; var VDest : UInt16); {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use CopyBytesToHostWord'{$ENDIF};{$ENDIF}
+  procedure CopyTIdNetworkLongWord(const ASource: UInt32; var VDest: TIdBytes; const ADestIndex: Integer); {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use CopyTIdNetworkLongWord'{$ENDIF};{$ENDIF}
+  procedure CopyTIdNetworkWord(const ASource: UInt16; var VDest: TIdBytes; const ADestIndex: Integer); {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use CopyTIdNetworkWord'{$ENDIF};{$ENDIF}
+
   function CopyFileTo(const Source, Destination: TIdFileName): Boolean;
   function DomainName(const AHost: String): String;
   function EnsureMsgIDBrackets(const AMsgID: String): String;
@@ -477,7 +480,7 @@ type
   function GMTToLocalDateTime(S: string): TDateTime;
   function CookieStrToLocalDateTime(S: string): TDateTime;
   function IdGetDefaultCharSet : TIdCharSet;
-  function IntToBin(Value: LongWord): string;
+  function IntToBin(Value: UInt32): string;
   function IndyComputerName : String; // DotNet: see comments regarding GDotNetComputerName below
   function IndyCurrentYear : Integer;
 
@@ -493,8 +496,10 @@ type
   function IsTopDomain(const AStr: string): Boolean;
   function IsValidIP(const S: String): Boolean;
   function MakeTempFilename(const APath: TIdFileName = ''): TIdFileName;
-  function OrdFourByteToLongWord(AByte1, AByte2, AByte3, AByte4 : Byte): LongWord;
-  procedure LongWordToOrdFourByte(const AValue: LongWord; var VByte1, VByte2, VByte3, VByte4 : Byte);
+  function OrdFourByteToUInt32(AByte1, AByte2, AByte3, AByte4 : Byte): UInt32;
+  function OrdFourByteToLongWord(AByte1, AByte2, AByte3, AByte4 : Byte): UInt32; {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use OrdFourByteToUInt32()'{$ENDIF};{$ENDIF}
+  procedure UInt32ToOrdFourByte(const AValue: UInt32; var VByte1, VByte2, VByte3, VByte4 : Byte);
+  procedure LongWordToOrdFourByte(const AValue: UInt32; var VByte1, VByte2, VByte3, VByte4 : Byte); {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use UInt32ToOrdFourByte()'{$ENDIF};{$ENDIF}
 
   function PadString(const AString : String; const ALen : Integer; const AChar: Char): String;
   function UnquotedStr(const AStr : String): String;
@@ -502,8 +507,8 @@ type
   function ProcessPath(const ABasePath: String; const APath: String; const APathDelim: string = '/'): string;    {Do not Localize}
   function RightStr(const AStr: String; const Len: Integer): String;
   // still to figure out how to reproduce these under .Net
-  function ROL(const AVal: LongWord; AShift: Byte): LongWord;
-  function ROR(const AVal: LongWord; AShift: Byte): LongWord;
+  function ROL(const AVal: UInt32; AShift: Byte): UInt32;
+  function ROR(const AVal: UInt32; AShift: Byte): UInt32;
   function RPos(const ASub, AIn: String; AStart: Integer = -1): Integer;
   function IndySetLocalTime(Value: TDateTime): Boolean;
 
@@ -515,18 +520,23 @@ type
   function StrToWord(const Value: String): Word;
   function TimeZoneBias: TDateTime;
    //these are for FSP but may also help with MySQL
-  function UnixDateTimeToDelphiDateTime(UnixDateTime: LongWord): TDateTime;
-  function DateTimeToUnix(ADateTime: TDateTime): LongWord;
+  function UnixDateTimeToDelphiDateTime(UnixDateTime: UInt32): TDateTime;
+  function DateTimeToUnix(ADateTime: TDateTime): UInt32;
 
-  function TwoCharToWord(AChar1, AChar2: Char): Word;
+  function TwoCharToUInt16(AChar1, AChar2: Char): Word;
+  function TwoCharToWord(AChar1, AChar2: Char): Word; {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use TwoCharToUInt16()'{$ENDIF};{$ENDIF}
+
   function UpCaseFirst(const AStr: string): string;
   function UpCaseFirstWord(const AStr: string): string;
   function GetUniqueFileName(const APath, APrefix, AExt : String) : String;
-  procedure WordToTwoBytes(AWord : Word; ByteArray: TIdBytes; Index: integer);
-  function WordToStr(const Value: Word): String;
+  procedure UInt16ToTwoBytes(AWord : Word; ByteArray: TIdBytes; Index: integer);
+  procedure WordToTwoBytes(AWord : Word; ByteArray: TIdBytes; Index: integer); {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use UInt16ToTwoBytes()'{$ENDIF};{$ENDIF}
+  function UInt16ToStr(const Value: Word): String;
+  function WordToStr(const Value: Word): String; {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use UInt16ToStr()'{$ENDIF};{$ENDIF}
+
   //moved here so I can IFDEF a DotNET ver. that uses StringBuilder
   function IndyWrapText(const ALine, ABreakStr, ABreakChars : string; MaxCol: Integer): string;
- 
+
   //The following is for working on email headers and message part headers...
   function RemoveHeaderEntry(const AHeader, AEntry: string; AQuoteType: TIdHeaderQuotingType): string; overload;
   function RemoveHeaderEntry(const AHeader, AEntry: string; var VOld: String; AQuoteType: TIdHeaderQuotingType): string; overload;
@@ -605,7 +615,20 @@ uses
   IdAssignedNumbers,
   IdResourceStringsCore,
   IdResourceStringsProtocols,
-  IdStack;
+  IdStack
+  {$IFDEF HAS_IOUtils_TPath}
+    {$IFDEF VCL_XE2_OR_ABOVE}
+  , System.IOUtils
+    {$ELSE}
+  , IOUtils
+    {$ENDIF}
+  {$ENDIF}
+  {$IFDEF USE_OBJECT_ARC}
+    {$IFDEF HAS_UNIT_Generics_Collections}
+  , System.Generics.Collections
+    {$ENDIF}
+  {$ENDIF}
+  ;
 
 //
 
@@ -736,7 +759,7 @@ end;
 
 {$IFDEF WINDOWS}
 var
-  ATempPath: TIdFileName;
+  GTempPath: TIdFileName;
 {$ENDIF}
 
 function StartsWith(const ANSIStr, APattern : String) : Boolean;
@@ -751,7 +774,7 @@ begin
   //just in case someone is doing a recursive listing and there's a dir with the name total
 end;
 
-function UnixDateTimeToDelphiDateTime(UnixDateTime: LongWord): TDateTime;
+function UnixDateTimeToDelphiDateTime(UnixDateTime: UInt32): TDateTime;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
    Result := (UnixDateTime / 86400) + UnixStartDate;
@@ -761,50 +784,86 @@ From: http://homepages.borland.com/efg2lab/Library/UseNet/1999/0309b.txt
  //   Result := EncodeDate(1970, 1, 1) + (UnixDateTime / 86400); {86400=No. of secs. per day}
 end;
 
-function DateTimeToUnix(ADateTime: TDateTime): LongWord;
+function DateTimeToUnix(ADateTime: TDateTime): UInt32;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   //example: DateTimeToUnix(now);
   Result := Round((ADateTime - UnixStartDate) * 86400);
 end;
 
-procedure CopyBytesToHostWord(const ASource : TIdBytes; const ASourceIndex: Integer;
-  var VDest : Word);
+{$I IdDeprecatedImplBugOff.inc}
+procedure CopyBytesToHostWord(const ASource : TIdBytes; const ASourceIndex: Integer; var VDest : UInt16);
+{$I IdDeprecatedImplBugOn.inc}
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
-  VDest := IdGlobal.BytesToWord(ASource, ASourceIndex);
+  CopyBytesToHostUInt16(ASource, ASourceIndex, VDest);
+end;
+
+procedure CopyBytesToHostUInt16(const ASource : TIdBytes; const ASourceIndex: Integer; var VDest : UInt16);
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  VDest := BytesToUInt16(ASource, ASourceIndex);
   VDest := GStack.NetworkToHost(VDest);
 end;
 
-procedure CopyBytesToHostLongWord(const ASource : TIdBytes; const ASourceIndex: Integer;
-  var VDest : LongWord);
+{$I IdDeprecatedImplBugOff.inc}
+procedure CopyBytesToHostLongWord(const ASource : TIdBytes; const ASourceIndex: Integer; var VDest : UInt32);
+{$I IdDeprecatedImplBugOn.inc}
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
-  VDest := IdGlobal.BytesToLongWord(ASource, ASourceIndex);
+  CopyBytesToHostUInt32(ASource, ASourceIndex, VDest);
+end;
+
+procedure CopyBytesToHostUInt32(const ASource : TIdBytes; const ASourceIndex: Integer; var VDest : UInt32);
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  VDest := BytesToUInt32(ASource, ASourceIndex);
   VDest := GStack.NetworkToHost(VDest);
 end;
 
-procedure CopyTIdNetworkWord(const ASource: Word;
-    var VDest: TIdBytes; const ADestIndex: Integer);
+{$I IdDeprecatedImplBugOff.inc}
+procedure CopyTIdNetworkWord(const ASource: UInt16; var VDest: TIdBytes; const ADestIndex: Integer);
+{$I IdDeprecatedImplBugOn.inc}
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
-  CopyTIdWord(GStack.HostToNetwork(ASource),VDest,ADestIndex);
+  CopyTIdNetworkUInt16(ASource, VDest, ADestIndex);
 end;
 
-procedure CopyTIdNetworkLongWord(const ASource: LongWord;
-    var VDest: TIdBytes; const ADestIndex: Integer);
+procedure CopyTIdNetworkUInt16(const ASource: UInt16; var VDest: TIdBytes; const ADestIndex: Integer);
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
-  CopyTIdLongWord(GStack.HostToNetwork(ASource),VDest,ADestIndex);
+  CopyTIdUInt16(GStack.HostToNetwork(ASource),VDest,ADestIndex);
 end;
 
-function LongWordToFourChar(AValue : LongWord): string;
+{$I IdDeprecatedImplBugOff.inc}
+procedure CopyTIdNetworkLongWord(const ASource: UInt32; var VDest: TIdBytes; const ADestIndex: Integer);
+{$I IdDeprecatedImplBugOn.inc}
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  CopyTIdNetworkUInt32(ASource, VDest, ADestIndex);
+end;
+
+procedure CopyTIdNetworkUInt32(const ASource: UInt32; var VDest: TIdBytes; const ADestIndex: Integer);
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  CopyTIdUInt32(GStack.HostToNetwork(ASource),VDest,ADestIndex);
+end;
+
+function UInt32ToFourChar(AValue : UInt32): string;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := BytesToStringRaw(ToBytes(AValue));
 end;
 
-procedure WordToTwoBytes(AWord : Word; ByteArray: TIdBytes; Index: integer);
+{$I IdDeprecatedImplBugOff.inc}
+function LongWordToFourChar(AValue : UInt32): string;
+{$I IdDeprecatedImplBugOn.inc}
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := UInt32ToFourChar(AValue);
+end;
+
+procedure UInt16ToTwoBytes(AWord : Word; ByteArray: TIdBytes; Index: integer);
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   //ByteArray[Index] := AWord div 256;
@@ -813,12 +872,20 @@ begin
   ByteArray[Index] := AWord mod 256;
 end;
 
+{$I IdDeprecatedImplBugOff.inc}
+procedure WordToTwoBytes(AWord : Word; ByteArray: TIdBytes; Index: integer);
+{$I IdDeprecatedImplBugOn.inc}
+{$IFDEF USE_INLINE}inline;{$ENDIF}
+begin
+  UInt16ToTwoBytes(AWord, ByteArray, Index);
+end;
+
 function StrToWord(const Value: String): Word;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   if Length(Value) > 1 then begin
     {$IFDEF STRING_IS_UNICODE}
-    Result := TwoCharToWord(Value[1], Value[2]);
+    Result := TwoCharToUInt16(Value[1], Value[2]);
     {$ELSE}
     Result := PWord(Pointer(Value))^;
     {$ENDIF}
@@ -827,7 +894,7 @@ begin
   end;
 end;
 
-function WordToStr(const Value: Word): String;
+function UInt16ToStr(const Value: Word): String;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   {$IFDEF STRING_IS_UNICODE}
@@ -838,20 +905,36 @@ begin
   {$ENDIF}
 end;
 
-function OrdFourByteToLongWord(AByte1, AByte2, AByte3, AByte4 : Byte): LongWord;
+{$I IdDeprecatedImplBugOff.inc}
+function WordToStr(const Value: Word): String;
+{$I IdDeprecatedImplBugOn.inc}
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := UInt16ToStr(Value);
+end;
+
+function OrdFourByteToUInt32(AByte1, AByte2, AByte3, AByte4 : Byte): UInt32;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 var
   LValue: TIdBytes;
 begin
-  SetLength(LValue, 4);
+  SetLength(LValue, SizeOf(UInt32));
   LValue[0] := AByte1;
   LValue[1] := AByte2;
   LValue[2] := AByte3;
   LValue[3] := AByte4;
-  Result := BytesToLongWord(LValue);
+  Result := BytesToUInt32(LValue);
 end;
 
-procedure LongWordToOrdFourByte(const AValue: LongWord; var VByte1, VByte2, VByte3, VByte4 : Byte);
+{$I IdDeprecatedImplBugOff.inc}
+function OrdFourByteToLongWord(AByte1, AByte2, AByte3, AByte4 : Byte): UInt32;
+{$I IdDeprecatedImplBugOn.inc}
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := OrdFourByteToUInt32(AByte1, AByte2, AByte3, AByte4);
+end;
+
+procedure UInt32ToOrdFourByte(const AValue: UInt32; var VByte1, VByte2, VByte3, VByte4 : Byte);
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 var
   LValue: TIdBytes;
@@ -863,18 +946,34 @@ begin
   VByte4 := LValue[3];
 end;
 
-function TwoCharToWord(AChar1, AChar2: Char): Word;
+{$I IdDeprecatedImplBugOff.inc}
+procedure LongWordToOrdFourByte(const AValue: UInt32; var VByte1, VByte2, VByte3, VByte4 : Byte);
+{$I IdDeprecatedImplBugOn.inc}
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  UInt32ToOrdFourByte(AValue, VByte1, VByte2, VByte3, VByte4);
+end;
+
+function TwoCharToUInt16(AChar1, AChar2: Char): UInt16;
 //Since Replys are returned as Strings, we need a rountime to convert two
 // characters which are a 2 byte U Int into a two byte unsigned integer
 var
   LWord: TIdBytes;
 begin
-  SetLength(LWord, 2);
+  SetLength(LWord, SizeOf(UInt16));
   LWord[0] := Ord(AChar1);
   LWord[1] := Ord(AChar2);
-  Result := BytesToWord(LWord);
+  Result := BytesToUInt16(LWord);
 
 //  Result := Word((Ord(AChar1) shl 8) and $FF00) or Word(Ord(AChar2) and $00FF);
+end;
+
+{$I IdDeprecatedImplBugOff.inc}
+function TwoCharToWord(AChar1, AChar2: Char): Word;
+{$I IdDeprecatedImplBugOn.inc}
+{$IFDEF USE_INLINE}inline;{$ENDIF}
+begin
+  Result := TwoCharToUInt16(AChar1, AChar2);
 end;
 
 function CompareDateTime(const ADateTime1, ADateTime2 : TDateTime) : Integer;
@@ -957,6 +1056,20 @@ var
     Len, Offset, Found: Integer;
   begin
     Result := False;
+
+    // TODO: implement logic from IdVCard.ParseISO8601DateAndOrTime() here and then remove that function
+    {
+    var
+      LDate: TIdISO8601DateComps;
+      LTime: TIdISO8601TimeComps;
+    begin
+      Result := ParseISO8601DateAndOrTime(Value, LDate, LTime);
+      if Result then begin
+        VDateTime := EncodeDate(LDate.Year, LDate.Month, LDate.Day) + EncodeTime(LTime.Hour, LTime.Min, LTime.Sec, LTime.MSec);
+        Value := LTime.UTFOffset;
+      end;
+    end;
+    }
 
     S := Value;
     Len := Length(S);
@@ -1074,7 +1187,8 @@ begin
     end;
 
     // Workaround for some buggy web servers which use '-' to separate the date parts.    {Do not Localize}
-    if (IndyPos('-', Value) > 1) and (IndyPos('-', Value) < IndyPos(' ', Value)) then begin    {Do not Localize}
+    i := IndyPos('-', Value);    {Do not Localize}
+    if (i > 1) and (i < IndyPos(' ', Value)) then begin    {Do not Localize}
       sDelim := '-';    {Do not Localize}
     end else begin
       sDelim := ' ';    {Do not Localize}
@@ -1146,7 +1260,7 @@ begin
     // RLebeau 03/04/2009: some countries use dot instead of colon
     // for the time separator
     i := IndyPos('.', Value);       {do not localize}
-    if i > 0 then begin
+    if (i > 0) and (i < IndyPos(' ', Value)) then begin       {do not localize}
       sDelim := '.';                {do not localize}
     end else begin
       sDelim := ':';                {do not localize}
@@ -1334,7 +1448,7 @@ var
 {$ELSE}
 var
   SourceF, DestF : File;
-  NumRead, NumWritten: Longint;
+  NumRead, NumWritten: Integer;
   Buffer: array[1..2048] of Byte;
 {$ENDIF}
 begin
@@ -1427,31 +1541,49 @@ end;
 {$ENDIF}
 
 function MakeTempFilename(const APath: TIdFileName = ''): TIdFileName;
+{$IFNDEF FPC}
 var
   lPath: TIdFileName;
   lExt: TIdFileName;
+{$ENDIF}
 begin
-  lPath := APath;
+  {$IFDEF FPC}
 
-  {$IFDEF UNIX}
-  lExt := '';
+  //Do not use Tempnam in Unix-like Operating systems.  That function is dangerous
+  //and you will be warned about it when compiling.  FreePascal has GetTempFileName.  Use
+  //that instead.
+  Result := GetTempFileName(APath, 'Indy'); {Do not Localize}
+
   {$ELSE}
-  lExt := '.tmp';
-  {$ENDIF}
+
+  // NOT using TPath.GetTempFileName() in Delphi 2010+, or System.IO.Path.GetTempFileName()
+  // on .NET.  They force use of the system temp path instead of allowing APath, and they
+  // do not support custom file prefixes...
+
+  lPath := APath;
+  lExt := {$IFDEF UNIX}''{$ELSE}'.tmp'{$ENDIF}; {Do not Localize}
 
   {$IFDEF WINDOWS}
   if lPath = '' then begin
-    lPath := ATempPath;
+    lPath := GTempPath;
   end;
   {$ELSE}
     {$IFDEF DOTNET}
   if lPath = '' then begin
     lPath := System.IO.Path.GetTempPath;
   end;
+    {$ELSE}
+      {$IFDEF HAS_IOUtils_TPath}
+  if lPath = '' then begin
+    lPath := {$IFDEF VCL_XE2_OR_ABOVE}System.{$ENDIF}IOUtils.TPath.GetTempPath;
+  end;
+      {$ENDIF}
     {$ENDIF}
   {$ENDIF}
 
   Result := GetUniqueFilename(lPath, 'Indy', lExt);
+
+  {$ENDIF}
 end;
 
 
@@ -1478,8 +1610,12 @@ begin
 
   {$ELSE}
 
-  // TODO: Use Winapi.GetTempFileName() in Windows...
-  
+  // NOT using TPath.GetTempFileName() in Delphi 2010+, or System.IO.Path.GetTempFileName()
+  // on .NET.  They force use of the system temp path instead of allowing APath, and they
+  // do not support custom file prefixes...
+
+  // TODO: on Windows, use Winapi.GetTempFileName(), at least...
+
   LFQE := AExt;
 
   // period is optional in the extension... force it
@@ -1518,6 +1654,7 @@ end;
 // Find a token given a direction (>= 0 from start; < 0 from end)
 // S.G. 19/4/00:
 //  Changed to be more readable
+// TODO: make this faster
 function RPos(const ASub, AIn: String; AStart: Integer = -1): Integer;
 var
   i: Integer;
@@ -1537,6 +1674,7 @@ begin
   end;
   // Search for the string
   for i := LStartPos downto 1 do begin
+    // TODO: remove the need for Copy()
     if TextIsSame(Copy(AIn, i, LTokenLen), ASub) then begin
       Result := i;
       Break;
@@ -1792,6 +1930,7 @@ begin
     Result := Copy(AStr, LStrLen - Len+1, Len);
   end;
 end;
+
 function TimeZoneBias: TDateTime;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 {$IFNDEF FPC}
@@ -2366,14 +2505,8 @@ var
 begin
   if RawStrInternetToDateTime(S, Result) then begin
     DateTimeOffset := GmtOffsetStrToDateTime(S);
-    {-Apply GMT offset here}
-    if DateTimeOffset < 0.0 then begin
-      Result := Result + Abs(DateTimeOffset);
-    end else begin
-      Result := Result - DateTimeOffset;
-    end;
-    // Apply local offset
-    Result := Result + OffsetFromUTC;
+    {-Apply GMT and local offsets}
+    Result := Result - DateTimeOffset + OffsetFromUTC;
   end;
 end;
 
@@ -2633,8 +2766,8 @@ begin
   end;
 end;
 
-{ Takes a cardinal (DWORD)  value and returns the string representation of it's binary value}    {Do not Localize}
-function IntToBin(Value: LongWord): string;
+{ Takes a UInt32 value and returns the string representation of it's binary value}    {Do not Localize}
+function IntToBin(Value: UInt32): string;
 var
   i: Integer;
   {$IFDEF STRING_IS_IMMUTABLE}
@@ -3237,7 +3370,7 @@ begin
   LExt := IndyLowerCase(Ext);
   if Length(LExt) = 0 then begin
     if ARaiseOnError then begin
-      EIdException.Toss(RSMIMEExtensionEmpty);
+      raise EIdException.Create(RSMIMEExtensionEmpty);
     end;
     Exit;
   end;
@@ -3245,7 +3378,7 @@ begin
   LMIMEType := IndyLowerCase(MIMEType);
   if Length(LMIMEType) = 0 then begin
     if ARaiseOnError then begin
-      EIdException.Toss(RSMIMEMIMETypeEmpty);
+      raise EIdException.Create(RSMIMEMIMETypeEmpty);
     end;
     Exit;
   end;
@@ -3258,7 +3391,7 @@ begin
     FMIMEList.Add(LMIMEType);
   end else begin
     if ARaiseOnError then begin
-      EIdException.Toss(RSMIMEMIMEExtAlreadyExists);
+      raise EIdException.Create(RSMIMEMIMEExtAlreadyExists);
     end;
     Exit;
   end;
@@ -3356,10 +3489,21 @@ begin
 
   for I := 0 to AStrings.Count - 1 do begin
     S := AStrings[I];
-    P := Pos(MimeSeparator, S);
-    if P > 0 then begin
-      Ext := IndyLowerCase(Copy(S, 1, P - 1));
-      AddMimeType(Ext, Copy(S, P + 1, MaxInt), False);
+    // RLebeau 12/13/15: Calling Pos() with a Char as input creates a temporary
+    // String.  Normally this is fine, but profiling reveils this to be a big
+    // bottleneck for code that makes a lot of calls to Pos() in a loop, so need
+    // to scan through the string looking for the character without a conversion...
+    //
+    // P := Pos(MimeSeparator, S);
+    // if P > 0 then begin
+    //
+    for P := 1 to Length(S) do begin
+      //if CharEquals(S, P, MimeSeparator) then begin
+      if S[P] = MimeSeparator then begin
+        Ext := IndyLowerCase(Copy(S, 1, P - 1));
+        AddMimeType(Ext, Copy(S, P + 1, MaxInt), False);
+        Break;
+      end;
     end;
   end;
 end;
@@ -3384,7 +3528,7 @@ var
   LErr: Boolean;
 begin
   LErr := False; // keep the compiler happy
-  IPv4ToDWord(S, LErr);
+  IPv4ToUInt32(S, LErr);
   if LErr then begin
     LErr := (MakeCanonicalIPv6Address(S) = '');
   end;
@@ -3857,7 +4001,12 @@ var
   LEncoding: IIdTextEncoding;
 begin
   VCharSet :=  '';
-//  AHeaders.Clear;
+  {if AHeaders <> nil then begin
+    AHeaders.Clear;
+  end;}
+  if AStream = nil then begin
+    Exit; // just in case
+  end;
   AStream.Position := 0;
   LEncoding := IndyTextEncoding_8Bit;
   // TODO: parse the stream as-is without reading it into a String first...
@@ -4012,10 +4161,73 @@ const
     {HTTP  } '()<>@,;:\"/[]?={} '#9 {do not localize}
     );
 
-procedure SplitHeaderSubItems(AHeaderLine: String; AItems: TStrings;
+{$IFDEF USE_OBJECT_ARC}
+// Under ARC, SplitHeaderSubItems() cannot put a non-TObject pointer value in
+// the TStrings.Objects[] property...
+type
+  TIdHeaderNameValueItem = record
+    Name, Value: String;
+    Quoted: Boolean;
+    constructor Create(const AName, AValue: String; const AQuoted: Boolean);
+  end;
+
+  TIdHeaderNameValueList = class(TList<TIdHeaderNameValueItem>)
+  public
+    function GetValue(const AName: string): string;
+    function IndexOfName(const AName: string): Integer;
+    procedure SetValue(const AIndex: Integer; const AValue: String);
+  end;
+
+constructor TIdHeaderNameValueItem.Create(const AName, AValue: String; const AQuoted: Boolean);
+begin
+  Name := AName;
+  Value := AValue;
+  Quoted := AQuoted;
+end;
+
+function TIdHeaderNameValueList.GetValue(const AName: string): string;
+var
+  I: Integer;
+begin
+  I := IndexOfName(AName);
+  if I <> -1  then begin
+    Result := Items[I].Value;
+  end else begin
+    Result := '';
+  end;
+end;
+
+function TIdHeaderNameValueList.IndexOfName(const AName: string): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  for I := 0 to Count-1 do
+  begin
+    if TextIsSame(Items[I].Name, AName) then
+    begin
+      Result := I;
+      Exit;
+    end;
+  end;
+end;
+
+procedure TIdHeaderNameValueList.SetValue(const AIndex: Integer; const AValue: String);
+var
+  LItem: TIdHeaderNameValueItem;
+begin
+  LItem := Items[AIndex];
+  LItem.Value := AValue;
+  Items[AIndex] := LItem;
+end;
+{$ENDIF}
+
+procedure SplitHeaderSubItems(AHeaderLine: String;
+  AItems: {$IFDEF USE_OBJECT_ARC}TIdHeaderNameValueList{$ELSE}TStrings{$ENDIF};
   AQuoteType: TIdHeaderQuotingType);
 var
   LName, LValue, LSep: String;
+  LQuoted: Boolean;
   I: Integer;
 
   function FetchQuotedString(var VHeaderLine: string): string;
@@ -4051,7 +4263,8 @@ begin
     end;
     LName := Trim(Fetch(AHeaderLine, '=')); {do not localize}
     AHeaderLine := TrimLeft(AHeaderLine);
-    if TextStartsWith(AHeaderLine, '"') then {do not localize}
+    LQuoted := TextStartsWith(AHeaderLine, '"'); {do not localize}
+    if LQuoted then
     begin
       LValue := FetchQuotedString(AHeaderLine);
     end else begin
@@ -4068,8 +4281,12 @@ begin
         AHeaderLine := '';
       end;
     end;
-    if (LName <> '') and (LValue <> '') then begin
-      AItems.Add(LName + '=' + LValue);
+    if (LName <> '') and ((LValue <> '') or LQuoted) then begin
+      {$IFDEF USE_OBJECT_ARC}
+      AItems.Add(TIdHeaderNameValueItem.Create(LName, LValue, LQuoted));
+      {$ELSE}
+      AItems.AddObject(LName + '=' + LValue, TObject(LQuoted));
+      {$ENDIF}
     end;
   end;
 end;
@@ -4077,29 +4294,32 @@ end;
 function ExtractHeaderSubItem(const AHeaderLine, ASubItem: String;
   AQuoteType: TIdHeaderQuotingType): String;
 var
-  LItems: TStringList;
-  {$IFNDEF HAS_TStringList_CaseSensitive}
+  LItems: {$IFDEF USE_OBJECT_ARC}TIdHeaderNameValueList{$ELSE}TStringList{$ENDIF};
+  {$IFNDEF USE_OBJECT_ARC}
+    {$IFNDEF HAS_TStringList_CaseSensitive}
   I: Integer;
-  LTmp: string;
+    {$ENDIF}
   {$ENDIF}
 begin
   Result := '';
-  LItems := TStringList.Create;
+  // TODO: instead of splitting the header into a list of name=value pairs,
+  // allocating memory for it, just parse the input string in-place and extract
+  // the necessary substring from it...
+  LItems := {$IFDEF USE_OBJECT_ARC}TIdHeaderNameValueList{$ELSE}TStringList{$ENDIF}.Create;
   try
     SplitHeaderSubItems(AHeaderLine, LItems, AQuoteType);
-    {$IFDEF HAS_TStringList_CaseSensitive}
+    {$IFDEF USE_OBJECT_ARC}
+    Result := LItems.GetValue(ASubItem);
+    {$ELSE}
+      {$IFDEF HAS_TStringList_CaseSensitive}
     LItems.CaseSensitive := False;
     Result := LItems.Values[ASubItem];
-    {$ELSE}
-    for I := 0 to LItems.Count-1 do
-    begin
-      if TextIsSame(LItems.Names[I], ASubItem) then
-      begin
-        LTmp := LItems.Strings[I];
-        Result := Copy(LTmp, Pos('=', LTmp)+1, MaxInt); {do not localize}
-        Break;
-      end;
+      {$ELSE}
+    I := IndyIndexOfName(LItems, ASubItem);
+    if I <> -1 then begin
+      Result := IndyValueFromIndex(LItems, I);
     end;
+      {$ENDIF}
     {$ENDIF}
   finally
     LItems.Free;
@@ -4117,31 +4337,11 @@ end;
 function ReplaceHeaderSubItem(const AHeaderLine, ASubItem, AValue: String;
   var VOld: String; AQuoteType: TIdHeaderQuotingType): String;
 var
-  LItems: TStringList;
+  LItems: {$IFDEF USE_OBJECT_ARC}TIdHeaderNameValueList{$ELSE}TStringList{$ENDIF};
   I: Integer;
-  {$IFNDEF HAS_TStrings_ValueFromIndex}
-  LTmp: string;
-  {$ENDIF}
   LValue: string;
 
-  {$IFNDEF HAS_TStringList_CaseSensitive}
-  function FindIndexOfItem: Integer;
-  var
-    I: Integer;
-  begin
-    for I := 0 to LItems.Count-1 do
-    begin
-      if TextIsSame(LItems.Names[I], ASubItem) then
-      begin
-        Result := I;
-        Exit;
-      end;
-    end;
-    Result := -1;
-  end;
-  {$ENDIF}
-
-  function QuoteString(const S: String): String;
+  function QuoteString(const S: String; const AForceQuotes: Boolean): String;
   var
     I: Integer;
     LAddQuotes: Boolean;
@@ -4151,7 +4351,7 @@ var
     if Length(S) = 0 then begin
       Exit;
     end;
-    LAddQuotes := False;
+    LAddQuotes := AForceQuotes;
     LNeedQuotes := CharRange(#0, #32) + QuoteSpecials[AQuoteType] + #127;
     // TODO: disable this logic for HTTP 1.0
     LNeedEscape := '"\'; {Do not Localize}
@@ -4175,39 +4375,65 @@ var
 
 begin
   Result := '';
-  LItems := TStringList.Create;
+  // TODO: instead of splitting the header into a list of name=value pairs,
+  // allocating memory for it, and then putting the list back together, just
+  // parse the input string in-place and extract/replace the necessary
+  // substring from it as needed, preserving the rest of the string as-is...
+  LItems := {$IFDEF USE_OBJECT_ARC}TIdHeaderNameValueList{$ELSE}TStringList{$ENDIF}.Create;
   try
     SplitHeaderSubItems(AHeaderLine, LItems, AQuoteType);
-    {$IFDEF HAS_TStringList_CaseSensitive}
-    LItems.CaseSensitive := False;
+    {$IFDEF USE_OBJECT_ARC}
     I := LItems.IndexOfName(ASubItem);
     {$ELSE}
-    I := FindIndexOfItem;
+      {$IFDEF HAS_TStringList_CaseSensitive}
+    LItems.CaseSensitive := False;
+      {$ENDIF}
+    I := IndyIndexOfName(LItems, ASubItem);
     {$ENDIF}
     if I >= 0 then begin
+      {$IFDEF USE_OBJECT_ARC}
+      VOld := LItems[I].Value;
+      {$ELSE}
       VOld := LItems.Strings[I];
       Fetch(VOld, '=');
+      {$ENDIF}
     end else begin
       VOld := '';
     end;
     LValue := Trim(AValue);
     if LValue <> '' then begin
+      {$IFDEF USE_OBJECT_ARC}
       if I < 0 then begin
-        I := LItems.Add('');
+        LItems.Add(TIdHeaderNameValueItem.Create(ASubItem, LValue, False));
+      end else begin
+        LItems.SetValue(I, LValue);
       end;
-      LItems.Strings[I] := ASubItem + '=' + LValue; {do not localize}
+      {$ELSE}
+      if I < 0 then begin
+        LItems.Add(ASubItem + '=' + LValue); {do not localize}
+      end else begin
+        {$IFDEF HAS_TStrings_ValueFromIndex}
+        LItems.ValueFromIndex[I] := LValue;
+        {$ELSE}
+        LItems.Strings[I] := ASubItem + '=' + LValue; {do not localize}
+        {$ENDIF}
+      end;
+      {$ENDIF}
     end
-    else if I >= 0 then begin
+    else if I < 0 then begin
+      // subitem not found, just return the original header as-is...
+      Result := AHeaderLine;
+      Exit;
+    end else begin
       LItems.Delete(I);
     end;
     Result := ExtractHeaderItem(AHeaderLine);
     if Result <> '' then begin
       for I := 0 to LItems.Count-1 do begin
-        {$IFDEF HAS_TStrings_ValueFromIndex}
-        Result := Result + '; ' + LItems.Names[I] + '=' + QuoteString(LItems.ValueFromIndex[I]); {do not localize}
+        {$IFDEF USE_OBJECT_ARC}
+        Result := Result + '; ' + LItems[I].Name + '=' + QuoteString(LItems[I].Value, LItems[I].Quoted); {do not localize}
         {$ELSE}
-        LTmp := LItems.Strings[I];
-        Result := Result + '; ' + LItems.Names[I] + '=' + QuoteString(Copy(LTmp, Pos('=', LTmp)+1, MaxInt)); {do not localize}
+        Result := Result + '; ' + LItems.Names[I] + '=' + QuoteString(IndyValueFromIndex(LItems, I), Boolean(LItems.Objects[I])); {do not localize}
         {$ENDIF}
       end;
     end;
@@ -4284,10 +4510,10 @@ function GetClockValue : Int64;
 {$ENDIF}
 {$IFDEF WINDOWS}
 type
-  TLong64Rec = record
-    case LongInt of
-      0 : (High : LongWord;
-           Low : LongWord);
+  TInt64Rec = record
+    case Integer of
+      0 : (High : UInt32;
+           Low : UInt32);
       1 : (Long : Int64);
     end;
 
@@ -4306,8 +4532,8 @@ begin
     // TODO
     {$ELSE}
   Windows.GetSystemTimeAsFileTime(LFTime);
-  TLong64Rec(Result).Low := LFTime.dwLowDateTime;
-  TLong64Rec(Result).High := LFTime.dwHighDateTime;
+  TInt64Rec(Result).Low := LFTime.dwLowDateTime;
+  TInt64Rec(Result).High := LFTime.dwHighDateTime;
     {$ENDIF}
   {$ENDIF}
   {$IFDEF UNIX}
@@ -4344,15 +4570,18 @@ end;
     {$DEFINE NO_NATIVE_ASM}
   {$ENDIF}
 {$ENDIF}
+{$IFDEF LINUX64}
+  {$DEFINE NO_NATIVE_ASM}
+{$ENDIF}
 
 {$IFDEF NO_NATIVE_ASM}
-function ROL(const AVal: LongWord; AShift: Byte): LongWord;
+function ROL(const AVal: UInt32; AShift: Byte): UInt32;
   {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
    Result := (AVal shl AShift) or (AVal shr (32 - AShift));
 end;
 
-function ROR(const AVal: LongWord; AShift: Byte): LongWord;
+function ROR(const AVal: UInt32; AShift: Byte): UInt32;
   {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
    Result := (AVal shr AShift) or (AVal shl (32 - AShift)) ;
@@ -4362,7 +4591,7 @@ end;
 
 // 32-bit: Arg1=EAX, Arg2=DL
 // 64-bit: Arg1=ECX, Arg2=DL
-function ROL(const AVal: LongWord; AShift: Byte): LongWord; assembler;
+function ROL(const AVal: UInt32; AShift: Byte): UInt32; assembler;
 asm
   {$IFDEF CPU64}
   mov eax, ecx
@@ -4371,7 +4600,7 @@ asm
   rol  eax, cl
 end;
 
-function ROR(const AVal: LongWord; AShift: Byte): LongWord; assembler;
+function ROR(const AVal: UInt32; AShift: Byte): UInt32; assembler;
 asm
   {$IFDEF CPU64}
   mov eax, ecx
@@ -4396,8 +4625,12 @@ var
 {$ENDIF}
 {$IFDEF WINDOWS}
 var
+  {$IFDEF WINCE}
+  Reg: TRegistry;
+  {$ELSE}
   LHost: array[0..MAX_COMPUTERNAME_LENGTH] of Char;
-  i: LongWord;
+  i: DWORD;
+  {$ENDIF}
 {$ENDIF}
 begin
   Result := '';
@@ -4435,7 +4668,16 @@ begin
   {$ENDIF}
   {$IFDEF WINDOWS}
     {$IFDEF WINCE}
-      {$WARNING To Do - find some way to get the Computer Name.}
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_LOCAL_MACHINE;
+    if Reg.OpenKeyReadOnly('\Ident') then begin
+      Result := Reg.ReadString('Name');
+      Reg.CloseKey;
+    end;
+  finally
+    Reg.Free;
+  end;
     {$ELSE}
   i := MAX_COMPUTERNAME_LENGTH;
   if GetComputerName(LHost, i) then begin
@@ -4633,6 +4875,25 @@ begin
       end;
     end;
 
+    { TODO: finish implementing this
+    if PosInStrArray(
+      ACharSet,
+      ['ISO-2022-JP', 'ISO-2022-JP-1', 'ISO-2022-JP-2', 'ISO-2022-JP-3', 'ISO-2022-JP-2004'], {do not localize
+      False) <> -1 then
+    begin
+      Result := TIdTextEncoding_ISO2022JP.Create;
+      Exit;
+    end;
+    }
+
+    { TODO: implement this
+    if TextIsSame(ACharSet, 'ISO-2022-KR') then {do not localize
+    begin
+      Result := TIdTextEncoding_ISO2022KR.Create;
+      Exit;
+    end;
+    }
+
     // RLebeau 3/13/09: if there is a problem initializing an encoding
     // class for the requested charset, either because the charset is
     // not known to Indy, or because the OS does not support it natively,
@@ -4664,16 +4925,6 @@ begin
 
   if not Assigned(Result) then
   begin
-    { TODO: finish implementing this
-    if PosInStrArray(
-      ACharSet,
-      ['ISO-2022-JP', 'ISO-2022-JP-1', 'ISO-2022-JP-2', 'ISO-2022-JP-3', 'ISO-2022-JP-2004'], {do not localize
-      False) <> -1 then
-    begin
-      Result := TIdTextEncoding_ISO2022JP.Create;
-      Exit;
-    end;
-    }
     Result := IndyTextEncoding_8Bit;
   end;
 end;
@@ -4770,7 +5021,7 @@ end;
 
 initialization
   {$IFDEF WINDOWS}
-  ATempPath := TempPath;
+  GTempPath := TempPath;
   {$ENDIF}
   SetLength(IndyFalseBoolStrs, 1);
   IndyFalseBoolStrs[Low(IndyFalseBoolStrs)] := 'FALSE';    {Do not Localize}

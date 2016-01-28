@@ -43,17 +43,18 @@ interface
 
 uses
   Classes,
+  IdGlobal,
   IdFTPList, IdFTPListParseBase;
 
 type
    TIdXecomMicroRTOSTPListItem = class(TIdFTPListItem)
    protected
-     FMemStart: LongWord;
-     FMemEnd: LongWord;
+     FMemStart: UInt32;
+     FMemEnd: UInt32;
    public
      constructor Create(AOwner: TCollection); override;
-     property MemStart: LongWord read FMemStart write FMemStart;
-     property MemEnd: LongWord read FMemEnd write FMemEnd;
+     property MemStart: UInt32 read FMemStart write FMemStart;
+     property MemEnd: UInt32 read FMemEnd write FMemEnd;
    end;
 
   TIdFTPLPXecomMicroRTOS = class(TIdFTPListBaseHeader)
@@ -78,7 +79,7 @@ type
 implementation
 
 uses
-  IdGlobal, IdFTPCommon, IdGlobalProtocols, IdStrings,
+  IdFTPCommon, IdGlobalProtocols, IdStrings,
   SysUtils;
 
 { TIdFTPLPXecomMicroRTOS }

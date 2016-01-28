@@ -45,6 +45,7 @@ interface
 
 uses
   Classes,
+  IdGlobal,
   IdFTPList, IdFTPListParseBase,IdFTPListTypes;
 
 type
@@ -53,12 +54,12 @@ type
     FOS9OwnerPermissions : String;
     FOS9PublicPermissions : String;
     FOS9MiscPermissions : String;
-    FOS9Sector: LongWord;
+    FOS9Sector: UInt32;
   public
     property OS9OwnerPermissions : String read FOS9OwnerPermissions write FOS9OwnerPermissions;
     property OS9PublicPermissions : String read FOS9PublicPermissions write FOS9PublicPermissions;
     property OS9MiscPermissions : String read FOS9MiscPermissions write FOS9MiscPermissions;
-    property OS9Sector : LongWord read FOS9Sector write FOS9Sector;
+    property OS9Sector : UInt32 read FOS9Sector write FOS9Sector;
   end;
 
   TIdFTPLPMicrowareOS9 = class(TIdFTPListBaseHeader)
@@ -82,7 +83,7 @@ type
 implementation
 
 uses
-  IdGlobal, IdFTPCommon, IdGlobalProtocols, IdStrings, SysUtils;
+  IdFTPCommon, IdGlobalProtocols, IdStrings, SysUtils;
 
 const
   MICROWARE_OS9 = 'MicroWare OS-9'; {do not localize}

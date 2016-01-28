@@ -604,10 +604,10 @@ end;
 }
 
 
-function GetRandomString(NumChar: Cardinal): string;
+function GetRandomString(NumChar: UInt32): string;
 const
   CharMap = 'qwertzuiopasdfghjklyxcvbnmQWERTZUIOPASDFGHJKLYXCVBNM1234567890';    {Do not Localize}
-  MaxChar: Cardinal = Length(CharMap) - 1;
+  MaxChar: UInt32 = Length(CharMap) - 1;
 var
   i: integer;
   {$IFDEF STRING_IS_IMMUTABLE}
@@ -1221,7 +1221,12 @@ var
         LRequestInfo.PostStream.Position := 0;
       end;
     end
-    else begin
+    // If HTTP Pipelining is used by the client, bytes may exist that belong to
+    // the NEXT request!  We need to look at the CURRENT request and only check
+    // for misreported body data if a body is actually expected.  GET and HEAD
+    // requests do not have bodies...
+    else if LRequestInfo.CommandType in [hcPOST, hcPUT] then
+    begin
       if LIOHandler.InputBufferIsEmpty then begin
         LIOHandler.CheckForDataOnSource(1);
       end;
@@ -1626,7 +1631,7 @@ begin
     // gets called by Notification() if the sessionList is freed while
     // the server is still Active?
     if Active then begin
-      EIdException.Toss(RSHTTPCannotSwitchSessionListWhenActive);
+      raise EIdException.Create(RSHTTPCannotSwitchSessionListWhenActive);
     end;
 
     // under ARC, all weak references to a freed object get nil'ed automatically
@@ -2114,7 +2119,7 @@ var
   LBufferingStarted: Boolean;
 begin
   if HeaderHasBeenWritten then begin
-    EIdHTTPHeaderAlreadyWritten.Toss(RSHTTPHeaderAlreadyWritten);
+    raise EIdHTTPHeaderAlreadyWritten.Create(RSHTTPHeaderAlreadyWritten);
   end;
   FHeaderHasBeenWritten := True;
 
@@ -2388,7 +2393,6 @@ begin
   // under DotNet. How low do you want to go?
   IndySetThreadPriority(Self, tpLowest);
   FSessionList := SessionList;
-  FreeOnTerminate := False;
 end;
 
 procedure TIdHTTPSessionCleanerThread.Run;

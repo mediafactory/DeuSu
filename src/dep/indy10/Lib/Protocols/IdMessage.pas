@@ -459,7 +459,7 @@ type
     property MsgId: string read FMsgId write SetMsgID;
     property Headers: TIdHeaderList read FHeaders write SetHeaders;
     property MessageParts: TIdMessageParts read FMessageParts;
-    property MIMEBoundary: TIdMIMEBoundary read FMIMEBoundary write FMIMEBoundary;
+    property MIMEBoundary: TIdMIMEBoundary read FMIMEBoundary;
     property UID: String read FUID write FUID;
     property IsMsgSinglePartMime: Boolean read FIsMsgSinglePartMime write FIsMsgSinglePartMime;
   published
@@ -901,8 +901,8 @@ begin
     if FLastGeneratedHeaders.Values['Message-ID'] <> '' then begin  {do not localize}
       FLastGeneratedHeaders.Values['In-Reply-To'] := FLastGeneratedHeaders.Values['Message-ID'];  {do not localize}
     end else begin
-      {CC: The following was originally present, but it so wrong that it has to go!
-      Values['In-Reply-To'] := Subject;   {do not localize}
+     {CC: The following was originally present, but it so wrong that it has to go!}
+     //Values['In-Reply-To'] := Subject;   {do not localize}
     end;
   end else begin
     FLastGeneratedHeaders.Values['In-Reply-To'] := InReplyTo; {do not localize}
@@ -1203,7 +1203,7 @@ var
   LStream: TIdReadFileExclusiveStream;
 begin
   if not FileExists(AFilename) then begin
-    EIdMessageCannotLoad.Toss(IndyFormat(RSIdMessageCannotLoad, [AFilename]));
+    raise EIdMessageCannotLoad.CreateFmt(RSIdMessageCannotLoad, [AFilename]);
   end;
   LStream := TIdReadFileExclusiveStream.Create(AFilename); try
     LoadFromStream(LStream, AHeadersOnly);

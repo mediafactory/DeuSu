@@ -7058,7 +7058,12 @@ const
   SSL_CTRL_GET_EXTRA_CHAIN_CERTS = 82;
   {$EXTERNALSYM SSL_CTRL_CLEAR_EXTRA_CHAIN_CERTS}
   SSL_CTRL_CLEAR_EXTRA_CHAIN_CERTS = 83;
-
+  {$EXTERNALSYM SSL_CTRL_CHAIN}  //OpenSSL 1.0.2
+  SSL_CTRL_CHAIN = 88;
+  {$EXTERNALSYM SSL_CTRL_CHAIN_CERT} //OpenSSL 1.0.2
+  SSL_CTRL_CHAIN_CERT = 89;
+  {$EXTERNALSYM SSL_CTRL_GET_CHAIN_CERTS} //OpenSSL 1.0.2
+  SSL_CTRL_GET_CHAIN_CERTS = 115;
   {$EXTERNALSYM SSL_CTRL_GET_SESSION_REUSED}
   SSL_CTRL_GET_SESSION_REUSED = 8;
   {$EXTERNALSYM SSL_CTRL_GET_CLIENT_CERT_REQUEST}
@@ -12684,6 +12689,8 @@ type
   {$EXTERNALSYM PSTACK_OF_X509}
   PSTACK_OF_X509 = PSTACK;
   {$ENDIF}
+  {$EXTERNALSYM PPSTACK_OF_X509}
+  PPSTACK_OF_X509 = ^PSTACK_OF_X509;
   //fips.h
   //engiene.h
   {$IFNDEF OPENSSL_NO_ENGINE}
@@ -16985,7 +16992,7 @@ var
   {$EXTERNALSYM d2i_PKCS12_bio}
   d2i_PKCS12_bio: function(bp: PBIO; x: PPPKCS12): PPKCS12 cdecl = nil;
   {$EXTERNALSYM PKCS12_parse}
-  PKCS12_parse: function(P12: PPKCS12; Password: PIdAnsiChar; out PrivateKey: PEVP_PKEY; out Cert: PX509; out CertChain: PSTACK_OF_X509): TIdC_INT cdecl = nil;
+  PKCS12_parse: function(P12: PPKCS12; Password: PIdAnsiChar; out PrivateKey: PEVP_PKEY; out Cert: PX509; CertChain: PPSTACK_OF_X509): TIdC_INT cdecl = nil;
   {$ENDIF}
 
   {$EXTERNALSYM X509_new}
@@ -17066,6 +17073,8 @@ var
   SSL_CTX_use_certificate : function(ctx: PSSL_CTX; x: PX509): TIdC_INT cdecl = nil;
   {$EXTERNALSYM SSL_CTX_use_certificate_file}
   SSL_CTX_use_certificate_file : function(ctx: PSSL_CTX; const _file: PIdAnsiChar; _type: TIdC_INT): TIdC_INT cdecl = nil;
+  {$EXTERNALSYM SSL_CTX_use_certificate_chain_file}   //OpenSSL 1.0.2
+  SSL_CTX_use_certificate_chain_file : function(ctx : PSSL_CTX; _file : PIdAnsiChar) : TIdC_INT cdecl = nil;
   {$EXTERNALSYM SSL_load_error_strings}
   SSL_load_error_strings : procedure cdecl = nil;
   {$EXTERNALSYM SSL_state_string_long}
@@ -17088,6 +17097,8 @@ var
   SSL_CTX_set_default_passwd_cb_userdata: procedure(ctx: PSSL_CTX; u: Pointer) cdecl = nil;
   {$EXTERNALSYM SSL_CTX_check_private_key}
   SSL_CTX_check_private_key : function(ctx: PSSL_CTX): TIdC_INT cdecl = nil;
+
+
   {$EXTERNALSYM SSL_new}
   SSL_new : function(ctx: PSSL_CTX): PSSL cdecl = nil;
   {$EXTERNALSYM SSL_free}
@@ -17331,7 +17342,6 @@ var
   EVP_idea_ecb: function :  PEVP_CIPHER cdecl = nil;
   {$EXTERNALSYM EVP_idea_cfb64}
   EVP_idea_cfb64: function :  PEVP_CIPHER cdecl = nil;
-//# define EVP_idea_cfb EVP_idea_cfb64 : function :  PEVP_CIPHER cdecl = nil;
   {$EXTERNALSYM EVP_idea_ofb}
   EVP_idea_ofb: function :  PEVP_CIPHER cdecl = nil;
   {$EXTERNALSYM EVP_idea_cbc}
@@ -18255,8 +18265,26 @@ procedure SSL_set_tmp_rsa(ssl : PSSL; rsa : PRSA);
 function SSL_set_tmp_dh(ssl : PSSL;dh : PDH) : TIdC_LONG;
  {$EXTERNALSYM SSL_set_tmp_ecdh}
 function SSL_set_tmp_ecdh(ssl : PSSL; ecdh : PEC_KEY) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_add0_chain_cert}  //OpenSSL 1.0.2
+function SSL_CTX_add0_chain_cert(ctx : PSSL_CTX; x509 : PX509) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_add1_chain_cert}  //OpenSSL 1.0.2
+function SSL_CTX_add1_chain_cert(ctx : PSSL_CTX; x509 : PX509) : TIdC_LONG;
  {$EXTERNALSYM SSL_CTX_add_extra_chain_cert}
 function SSL_CTX_add_extra_chain_cert(ctx : PSSL_CTX; x509 : PX509) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_get_extra_chain_certs}
+function SSL_CTX_get_extra_chain_certs(ctx : PSSL_CTX; var px509 : px509) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_get_extra_chain_certs_only}
+function SSL_CTX_get_extra_chain_certs_only(ctx: PSSL_CTX;var PX509 :PX509) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_clear_extra_chain_certs}
+function SSL_CTX_clear_extra_chain_certs(ctx : PSSL_CTX) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_set0_chain} //OpenSSL 1.0.2
+function SSL_CTX_set0_chain(ctx:PSSL_CTX; sk : PSTACK_OF_X509) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_set1_chain}  //OpenSSL 1.0.2
+function SSL_CTX_set1_chain(ctx:PSSL_CTX; sk : PSTACK_OF_X509) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_get0_chain_certs} //OpenSSL 1.0.2
+function SSL_CTX_get0_chain_certs(ctx :PSSL_CTX; var px509 :PX509) : TIdC_LONG;
+ {$EXTERNALSYM SSL_CTX_clear_chain_certs} //OpenSSL 1.0.2
+function SSL_CTX_clear_chain_certs(ctx :PSSL_CTX) : TIdC_LONG;
 
 {$IFNDEF OPENSSL_NO_TLSEXT}
  {$EXTERNALSYM SSL_set_tlsext_host_name}
@@ -18302,6 +18330,7 @@ function SSL_get_tlsext_heartbeat_pending(ssl : PSSL) : TIdC_LONG;
 function SSL_set_tlsext_heartbeat_no_requests(ssl : PSSL; arg : TIdC_LONG) : TIdC_LONG;
 {$endif}
 {$ENDIF}
+
  {$EXTERNALSYM TLS1_get_version}
 function TLS1_get_version(s : PSSL) : TIdC_INT;
  {$EXTERNALSYM TLS1_get_client_version}
@@ -18535,7 +18564,7 @@ function EVP_PKEY_assign_RSA(pkey: PEVP_PKEY; rsa: PIdAnsiChar): TIdC_INT;
 {$ENDIF}
 
 {$IFNDEF OPENSSL_NO_DSA}
- {$EXTERNALSYM EVP_PKEY_assign_DSA} 
+ {$EXTERNALSYM EVP_PKEY_assign_DSA}
 function EVP_PKEY_assign_DSA(pkey : PEVP_PKEY; dsa : PIdAnsiChar) : TIdC_INT;
 {$ENDIF}
 
@@ -18778,6 +18807,12 @@ type
   EIdDigestUpdate = class(EIdDigestError);
 
 function IsOpenSSL_1x : Boolean;
+function IsOpenSSL_SSLv2_Available : Boolean;
+function IsOpenSSL_SSLv3_Available : Boolean;
+function IsOpenSSL_SSLv23_Available : Boolean;
+function IsOpenSSL_TLSv1_1_Available : Boolean;
+function IsOpenSSL_TLSv1_2_Available : Boolean;
+function IsOpenSSL_DTLSv1_Available : Boolean;
 
 function RAND_bytes(buf : PIdAnsiChar; num : integer) : integer;
 function RAND_pseudo_bytes(buf : PIdAnsiChar; num : integer) : integer;
@@ -18849,6 +18884,54 @@ begin
   end else begin
     Result := False;
   end;
+end;
+
+function IsOpenSSL_SSLv2_Available : Boolean;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := Assigned(SSLv2_method) and
+    Assigned(SSLv2_server_method) and
+    Assigned(SSLv2_client_method);
+end;
+
+function IsOpenSSL_SSLv3_Available : Boolean;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := Assigned(SSLv3_method) and
+    Assigned(SSLv3_server_method) and
+    Assigned(SSLv3_client_method);
+end;
+
+function IsOpenSSL_SSLv23_Available : Boolean;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := Assigned(SSLv23_method) and
+    Assigned(SSLv23_server_method) and
+    Assigned(SSLv23_client_method);
+end;
+
+function IsOpenSSL_TLSv1_1_Available : Boolean;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := Assigned(TLSv1_1_method) and
+    Assigned(TLSv1_1_server_method) and
+    Assigned(TLSv1_1_client_method);
+end;
+
+function IsOpenSSL_TLSv1_2_Available : Boolean;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := Assigned(TLSv1_2_method) and
+    Assigned(TLSv1_2_server_method) and
+    Assigned(TLSv1_2_client_method);
+end;
+
+function IsOpenSSL_DTLSv1_Available : Boolean;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := Assigned(DTLSv1_method) and
+    Assigned(DTLSv1_server_method) and
+    Assigned(DTLSv1_client_method);
 end;
 
 //**************** FIPS Support backend *******************
@@ -19368,7 +19451,7 @@ const
   where the symbolic link libbsl.so and libcrypto.so do not exist}
   SSL_DLL_name         = 'libssl'; {Do not localize}
   SSLCLIB_DLL_name     = 'libcrypto'; {Do not localize}
-  SSLDLLVers : array [0..6] of string = ('','.10','.1.0.0','0.9.9','.0.9.8','.0.9.7','0.9.6');
+  SSLDLLVers : array [0..8] of string = ('','.10','.1.0.2','.1.0.1','.1.0.0','0.9.9','.0.9.8','.0.9.7','0.9.6');
   {$ENDIF}
   {$IFDEF WINDOWS}
 const
@@ -20718,27 +20801,20 @@ them in case we use them later.}
   fn_EVP_des_ecb = 'EVP_des_ecb'; {Do not localize}
   fn_EVP_des_ede = 'EVP_des_ede';  {Do not localize}
   fn_EVP_des_ede3 = 'EVP_des_ede3'; {Do not localize}
-    {$DEFINE EVP_des_cfb}
-    {$DEFINE EVP_des_cfb64}
   fn_EVP_des_cfb = 'EVP_des_cfb';  {Do not localize}
   fn_EVP_des_ede_cfb = 'EVP_des_ede_cfb';  {Do not localize}
   fn_EVP_des_ede3_cfb = 'EVP_des_ede3_cfb';  {Do not localize}
   fn_EVP_des_ofb = 'EVP_des_ofb';  {Do not localize}
   fn_EVP_des_ede_ofb = 'EVP_des_ede_ofb';  {Do not localize}
-    {$DEFINE EVP_des_ede_cfb}
-    {$DEFINE EVP_des_ede_cfb64}
   fn_EVP_des_ede3_ofb = 'EVP_des_ede3_ofb';  {Do not localize}
   fn_EVP_des_cbc = 'EVP_des_cbc';  {Do not localize}
   fn_EVP_des_ede_cbc = 'EVP_des_ede_cbc';  {Do not localize}
   fn_EVP_des_ede3_cbc = 'EVP_des_ede3_cbc';  {Do not localize}
-    {$DEFINE EVP_des_ede3_cfb}
-    {$DEFINE EVP_des_ede3_cfb64}
   fn_EVP_desx_cbc = 'EVP_desx_cbc';  {Do not localize}
   fn_EVP_des_ede3_cfb8 = 'EVP_des_ede3_cfb8'; {Do not localize}
   fn_EVP_des_ede_ecb = 'EVP_des_ede_ecb'; {Do not localize}
   fn_EVP_des_ede3_ecb = 'EVP_des_ede3_ecb';
   fn_EVP_des_cfb64 = 'EVP_des_cfb64';
-//  # define EVP_des_cfb EVP_des_cfb64
 
   fn_EVP_des_cfb1 = 'EVP_des_cfb1';
   fn_EVP_des_cfb8 = 'EVP_des_cfb8';
@@ -20760,8 +20836,6 @@ them in case we use them later.}
   {$IFNDEF OPENSSL_NO_IDEA}
   fn_EVP_idea_ecb = 'EVP_idea_ecb';  {Do not localize}
   fn_EVP_idea_cfb64 = 'EVP_idea_cfb64'; {Do not localize}
-    {$DEFINE EVP_idea_cfb}
-    {$DEFINE EVP_idea_cfb64 }
   fn_EVP_idea_cfb = 'EVP_idea_cfb';  {Do not localize}
   fn_EVP_idea_ofb = 'EVP_idea_ofb';  {Do not localize}
   fn_EVP_idea_cbc = 'EVP_idea_cbc';  {Do not localize}
@@ -20773,8 +20847,6 @@ them in case we use them later.}
   fn_EVP_rc2_64_cbc = 'EVP_rc2_64_cbc';  {Do not localize}
   fn_EVP_rc2_cfb64 = 'EVP_rc2_cfb64'; {Do not localize}
   fn_EVP_rc2_cfb = 'EVP_rc2_cfb';  {Do not localize}
-    {$DEFINE EVP_rc2_cfb}
-    {$DEFINE EVP_rc2_cfb64}
   fn_EVP_rc2_ofb = 'EVP_rc2_ofb';  {Do not localize}
   {$ENDIF}
   {$IFNDEF OPENSSL_NO_BF}
@@ -20782,8 +20854,6 @@ them in case we use them later.}
   fn_EVP_bf_cbc = 'EVP_bf_cbc';  {Do not localize}
   fn_EVP_bf_cfb = 'EVP_bf_cfb';  {Do not localize}
   fn_EVP_bf_cfb64 = 'EVP_bf_cfb64'; {Do not localize}
-    {$DEFINE EVP_bf_cfb}
-    {$DEFINE EVP_bf_cfb64}
   fn_EVP_bf_ofb = 'EVP_bf_ofb';  {Do not localize}
   {$ENDIF}
   {$IFNDEF OPENSSL_NO_CAST}
@@ -20791,8 +20861,6 @@ them in case we use them later.}
   fn_EVP_cast5_cbc = 'EVP_cast5_cbc';  {Do not localize}
   fn_EVP_cast5_cfb = 'EVP_cast5_cfb';  {Do not localize}
   fn_EVP_cast5_cfb64 = 'EVP_cast5_cfb64'; {Do not localize}
-    {$DEFINE EVP_cast5_cfb}
-    {$DEFINE EVP_cast5_cfb64}
   fn_EVP_cast5_ofb = 'EVP_cast5_ofb';  {Do not localize}
   {$ENDIF}
   {$IFNDEF OPENSSL_NO_RC5 }
@@ -20800,8 +20868,6 @@ them in case we use them later.}
   fn_EVP_rc5_32_12_16_ecb = 'EVP_rc5_32_12_16_ecb';  {Do not localize}
   fn_EVP_rc5_32_12_16_cfb = 'EVP_rc5_32_12_16_cfb';  {Do not localize}
   fn_EVP_rc5_32_12_16_cfb64 = 'EVP_rc5_32_12_16_cfb64'; {Do not localize}
-  {$DEFINE EVP_rc5_32_12_16_cfb}
-  {$DEFINE EVP_rc5_32_12_16_cfb64}
   fn_EVP_rc5_32_12_16_ofb = 'EVP_rc5_32_12_16_ofb';  {Do not localize}
   {$ENDIF}
   {$IFNDEF OPENSSL_NO_AES}
@@ -20815,8 +20881,6 @@ them in case we use them later.}
   fn_EVP_aes_128_gcm = 'EVP_aes_128_gcm'; {Do not localize}
   fn_EVP_aes_128_ccm = 'EVP_aes_128_ccm'; {Do not localize}
   fn_EVP_aes_128_xts = 'EVP_aes_128_xts'; {Do not localize}
-  {$DEFINE EVP_aes_128_cfb}
-  {$DEFINE EVP_aes_128_cfb128}
   fn_EVP_aes_192_ecb = 'EVP_aes_192_ecb'; {Do not localize}
   fn_EVP_aes_192_cbc = 'EVP_aes_192_cbc'; {Do not localize}
   fn_EVP_aes_192_cfb1 = 'EVP_aes_192_cfb1'; {Do not localize}
@@ -20825,17 +20889,12 @@ them in case we use them later.}
   fn_EVP_aes_192_ctr = 'EVP_aes_192_ctr';  {Do not localize}
   fn_EVP_aes_192_gcm = 'EVP_aes_192_gcm';  {Do not localize}
   fn_EVP_aes_192_ccm = 'EVP_aes_192_ccm';  {Do not localize}
-
-  {$DEFINE EVP_aes_192_cfb}
-  {$DEFINE EVP_aes_192_cfb128}
   fn_EVP_aes_192_ofb = 'EVP_aes_192_ofb'; {Do not localize}
   fn_EVP_aes_256_ecb = 'EVP_aes_256_ecb'; {Do not localize}
   fn_EVP_aes_256_cbc = 'EVP_aes_256_cbc'; {Do not localize}
   fn_EVP_aes_256_cfb1 = 'EVP_aes_256_cfb1'; {Do not localize}
   fn_EVP_aes_256_cfb8 = 'EVP_aes_256_cfb8'; {Do not localize}
   fn_EVP_aes_256_cfb128 = 'EVP_aes_256_cfb128'; {Do not localize}
-  {$DEFINE EVP_aes_256_cfb}
-  {$DEFINE EVP_aes_256_cfb128}
   fn_EVP_aes_256_ofb = 'EVP_aes_256_ofb'; {Do not localize}
   fn_EVP_aes_256_ctr = 'EVP_aes_256_ctr';  {Do not localize}
   fn_EVP_aes_256_gcm = 'EVP_aes_256_gcm';  {Do not localize}
@@ -20854,32 +20913,24 @@ them in case we use them later.}
   fn_EVP_camellia_128_cfb1 = 'EVP_camellia_128_cfb1'; {Do not localize}
   fn_EVP_camellia_128_cfb8 = 'EVP_camellia_128_cfb8'; {Do not localize}
   fn_EVP_camellia_128_cfb128 = 'EVP_camellia_128_cfb128'; {Do not localize}
-  {$DEFINE EVP_camellia_128_cfb}
-  {$DEFINE EVP_camellia_128_cfb128}
   fn_EVP_camellia_128_ofb = 'EVP_camellia_128_ofb'; {Do not localize}
   fn_EVP_camellia_192_ecb = 'EVP_camellia_192_ecb'; {Do not localize}
   fn_EVP_camellia_192_cbc = 'EVP_camellia_192_cbc'; {Do not localize}
   fn_EVP_camellia_192_cfb1 = 'EVP_camellia_192_cfb1'; {Do not localize}
   fn_EVP_camellia_192_cfb8 = 'EVP_camellia_192_cfb8'; {Do not localize}
   fn_EVP_camellia_192_cfb128 = 'EVP_camellia_192_cfb128'; {Do not localize}
-  {$DEFINE define EVP_camellia_192_cfb}
-  {$DEFINE EVP_camellia_192_cfb128}
   fn_EVP_camellia_192_ofb = 'EVP_camellia_192_ofb'; {Do not localize}
   fn_EVP_camellia_256_ecb = 'EVP_camellia_256_ecb'; {Do not localize}
   fn_EVP_camellia_256_cbc = 'EVP_camellia_256_cbc'; {Do not localize}
   fn_EVP_camellia_256_cfb1 = 'EVP_camellia_256_cfb1'; {Do not localize}
   fn_EVP_camellia_256_cfb8 = 'EVP_camellia_256_cfb8'; {Do not localize}
   fn_EVP_camellia_256_cfb128 = 'EVP_camellia_256_cfb128'; {Do not localize}
-  {$DEFINE EVP_camellia_256_cfb}
-  {$DEFINE EVP_camellia_256_cfb128}
   fn_EVP_camellia_256_ofb = 'EVP_camellia_256_ofb'; {Do not localize}
   {$ENDIF}
   {$IFNDEF OPENSSL_NO_SEED}
   fn_EVP_seed_ecb = 'EVP_seed_ecb'; {Do not localize}
   fn_EVP_seed_cbc = 'EVP_seed_cbc'; {Do not localize}
   fn_EVP_seed_cfb128 = 'EVP_seed_cfb128'; {Do not localize}
-  {$DEFINE EVP_seed_cfb}
-  {$DEFINE EVP_seed_cfb128}
   fn_EVP_seed_ofb = 'EVP_seed_ofb'; {Do not localize}
   {$ENDIF}
   fn_OPENSSL_add_all_algorithms_noconf = 'OPENSSL_add_all_algorithms_noconf';  {Do not localize}
@@ -21905,6 +21956,7 @@ them in case we use them later.}
   {$ENDIF}
   fn_SSL_CTX_use_PrivateKey_file = 'SSL_CTX_use_PrivateKey_file';  {Do not localize}
   fn_SSL_CTX_use_certificate_file = 'SSL_CTX_use_certificate_file';  {Do not localize}
+  fn_SSL_CTX_use_certificate_chain_file = 'SSL_CTX_use_certificate_chain_file'; {Do not localize}
   {$ifndef OPENSSL_NO_ENGINE}
   {CH fn_SSL_CTX_set_client_cert_engine = 'SSL_CTX_set_client_cert_engine'; } {Do not localize}
   {$endif}
@@ -22504,6 +22556,44 @@ end;
 
 {$ENDIF} // STATICLOAD_OPENSSL
 
+{$IFDEF ANDROID}
+// In Android 6, Google replaced OpenSSL with BoringSSL, which is a fork of
+// OpenSSL and does not export many functions, including the following...
+
+type
+  msg_callback_proc = procedure(write_p, version, content_type : TIdC_INT; const buf : Pointer; len: size_t; ssl: PSSL; arg: Pointer); cdecl;
+
+function Indy_ssl_callback_ctrl(s: PSSL; cb_id: TIdC_INT; fp: SSL_METHOD_PROC): TIdC_LONG; cdecl;
+begin
+  if cb_id = SSL_CTRL_SET_MSG_CALLBACK then begin
+    s.msg_callback := msg_callback_proc(fp);
+    Result := 1;
+  end else begin
+    Result := s.method.ssl_callback_ctrl(s, cb_id, fp);
+  end;
+end;
+
+function Indy_SSL_CTX_callback_ctrl(ctx: PSSL_CTX; cmd: TIdC_INT; fp: SSL_METHOD_PROC): TIdC_LONG; cdecl;
+begin
+  if cmd = SSL_CTRL_SET_MSG_CALLBACK then begin
+    ctx.msg_callback := msg_callback_proc(fp);
+    Result := 1;
+  end else begin
+    Result := ctx.method.ssl_ctx_callback_ctrl(ctx, cmd, fp);
+  end;
+end;
+
+procedure Indy_SSL_copy_session_id(sslTo: PSSL; const sslFrom: PSSL) cdecl;
+begin
+  // TODO: what to do here?
+end;
+
+procedure Indy_CRYPTO_lock(mode, _type : TIdC_INT; const _file : PIdAnsiChar; line : TIdC_INT) cdecl;
+begin
+  // TODO: what to do here?
+end;
+{$ENDIF}
+
 function Load: Boolean;
 begin
 {$IFDEF STATICLOAD_OPENSSL}
@@ -22539,6 +22629,10 @@ begin
     end;
   end;
 
+  // TODO: stop loading non-critical functions here.  We should use per-function
+  // stubs instead, similar to the approach used in IdWinsock2.pas, so functions
+  // are not loaded until they are actually used for the first time...
+
   @SSL_CTX_set_cipher_list := LoadFunction(fn_SSL_CTX_set_cipher_list);  //Used by Indy
   @SSL_CTX_new := LoadFunction(fn_SSL_CTX_new); //Used by Indy
   @SSL_CTX_free := LoadFunction(fn_SSL_CTX_free); //Used by Indy
@@ -22547,6 +22641,7 @@ begin
   @SSL_CTX_use_PrivateKey := LoadFunction(fn_SSL_CTX_use_PrivateKey);  //Used by Indy
   @SSL_CTX_use_certificate := LoadFunction(fn_SSL_CTX_use_certificate); //Used by Indy
   @SSL_CTX_use_certificate_file := LoadFunction(fn_SSL_CTX_use_certificate_file);   //Used by Indy
+  @SSL_CTX_use_certificate_chain_file := LoadFunction(fn_SSL_CTX_use_certificate_chain_file,False); //Used by Indy
   @SSL_load_error_strings := LoadFunction(fn_SSL_load_error_strings); //Used by Indy
   @SSL_state_string_long := LoadFunction(fn_SSL_state_string_long); //Used by Indy
   @SSL_alert_desc_string_long := LoadFunction(fn_SSL_alert_desc_string_long);  //Used by Indy
@@ -22568,32 +22663,51 @@ begin
   @SSL_pending := LoadFunction(fn_SSL_pending,False);
   @SSL_write := LoadFunction(fn_SSL_write);      //Used by Indy
   @SSL_ctrl := LoadFunction(fn_SSL_ctrl);
-  @SSL_callback_ctrl := LoadFunction(fn_SSL_callback_ctrl);
+  @SSL_callback_ctrl := LoadFunction(fn_SSL_callback_ctrl{$IFDEF ANDROID}, False{$ENDIF});
+  {$IFDEF ANDROID}
+  if not Assigned(SSL_callback_ctrl) then begin
+    @SSL_callback_ctrl := @Indy_SSL_callback_ctrl;
+  end;
+  {$ENDIF}
   @SSL_CTX_ctrl := LoadFunction(fn_SSL_CTX_ctrl);
-  @SSL_CTX_callback_ctrl := LoadFunction(fn_SSL_CTX_callback_ctrl);
+  @SSL_CTX_callback_ctrl := LoadFunction(fn_SSL_CTX_callback_ctrl{$IFDEF ANDROID}, False{$ENDIF});
+  {$IFDEF ANDROID}
+  if not Assigned(SSL_CTX_callback_ctrl) then begin
+    @SSL_CTX_callback_ctrl := @Indy_SSL_CTX_callback_ctrl;
+  end;
+  {$ENDIF}
   @SSL_get_error := LoadFunction(fn_SSL_get_error);           //Used by Indy
-  @SSLv2_method := LoadFunction(fn_SSLv2_method);                   //Used by Indy
-  @SSLv2_server_method := LoadFunction(fn_SSLv2_server_method);             //Used by Indy
-  @SSLv2_client_method := LoadFunction(fn_SSLv2_client_method);            //Used by Indy
-  @SSLv3_method := LoadFunction(fn_SSLv3_method);                        //Used by Indy
-  @SSLv3_server_method := LoadFunction(fn_SSLv3_server_method);           //Used by Indy
-  @SSLv3_client_method := LoadFunction(fn_SSLv3_client_method);          //Used by Indy
-  @SSLv23_method := LoadFunction(fn_SSLv23_method);                      //Used by Indy
-  @SSLv23_server_method := LoadFunction(fn_SSLv23_server_method);        //Used by Indy
-  @SSLv23_client_method := LoadFunction(fn_SSLv23_client_method);       //Used by Indy
-  @TLSv1_method := LoadFunction(fn_TLSv1_method);                         //Used by Indy
-  @TLSv1_server_method := LoadFunction(fn_TLSv1_server_method);         //Used by Indy
-  @TLSv1_client_method := LoadFunction(fn_TLSv1_client_method);          //Used by Indy
+
+  // RLebeau 9/7/2015 - making all of the "..._method()" functions optional.  If
+  // a user wants to disable a given SSL/TLS version at runtime, there is no need
+  // for it to be marked as "critical" at load time, in case it is not available
+  // in their version of OpenSSL.  For instance, some vendors disable SSLv2 so
+  // it is not even exported.  If a user wants to use a given version and it is
+  // not available in their version of OpenSSL, TIdSSLContext.SetSSLMethod() will
+  // now raise a runtime error...
+  @SSLv2_method := LoadFunction(fn_SSLv2_method,False);                   //Used by Indy
+  @SSLv2_server_method := LoadFunction(fn_SSLv2_server_method,False);             //Used by Indy
+  @SSLv2_client_method := LoadFunction(fn_SSLv2_client_method,False);            //Used by Indy
+  @SSLv3_method := LoadFunction(fn_SSLv3_method,False);                        //Used by Indy
+  @SSLv3_server_method := LoadFunction(fn_SSLv3_server_method,False);           //Used by Indy
+  @SSLv3_client_method := LoadFunction(fn_SSLv3_client_method,False);          //Used by Indy
+  @SSLv23_method := LoadFunction(fn_SSLv23_method,False);                      //Used by Indy
+  @SSLv23_server_method := LoadFunction(fn_SSLv23_server_method,False);        //Used by Indy
+  @SSLv23_client_method := LoadFunction(fn_SSLv23_client_method,False);       //Used by Indy
+  @TLSv1_method := LoadFunction(fn_TLSv1_method,False);                         //Used by Indy
+  @TLSv1_server_method := LoadFunction(fn_TLSv1_server_method,False);         //Used by Indy
+  @TLSv1_client_method := LoadFunction(fn_TLSv1_client_method,False);          //Used by Indy
   @TLSv1_1_method := LoadFunction(fn_TLSv1_1_method,False);              //Used by Indy
   @TLSv1_1_server_method := LoadFunction(fn_TLSv1_1_server_method,False);    //Used by Indy
   @TLSv1_1_client_method := LoadFunction(fn_TLSv1_1_client_method,False);   //Used by Indy
   @TLSv1_2_method := LoadFunction(fn_TLSv1_2_method,False);                //Used by Indy
   @TLSv1_2_server_method := LoadFunction(fn_TLSv1_2_server_method,False);  //Used by Indy
   @TLSv1_2_client_method := LoadFunction(fn_TLSv1_2_client_method,False);    //Used by Indy
-
   @DTLSv1_method := LoadFunction(fn_DTLSv1_method, False);
   @DTLSv1_server_method := LoadFunction(fn_DTLSv1_server_method, False);
   @DTLSv1_client_method := LoadFunction(fn_DTLSv1_client_method, False);
+  //
+
   @SSL_shutdown := LoadFunction(fn_SSL_shutdown);   //Used by Indy
   @SSL_set_connect_state := LoadFunction(fn_SSL_set_connect_state,False);
   @SSL_set_accept_state := LoadFunction(fn_SSL_set_accept_state,False);
@@ -22602,7 +22716,12 @@ begin
   @SSL_get_session := LoadFunction(fn_SSL_get_session); //Used by Indy
   @SSLeay_add_ssl_algorithms := LoadFunction(fn_SSLeay_add_ssl_algorithms);  //Used by Indy
   @SSL_SESSION_get_id := LoadFunction(fn_SSL_SESSION_get_id); //Used by Indy
-  @SSL_copy_session_id := LoadFunction(fn_SSL_copy_session_id);  //Used by Indy
+  @SSL_copy_session_id := LoadFunction(fn_SSL_copy_session_id{$IFDEF ANDROID}, False{$ENDIF});  //Used by Indy
+  {$IFDEF ANDROID}
+  if not Assigned(SSL_copy_session_id) then begin
+    @SSL_copy_session_id := @Indy_SSL_copy_session_id;
+  end;
+  {$ENDIF}
    // CRYPTO LIB
   @_SSLeay_version := LoadFunctionCLib(fn_SSLeay_version); //Used by Indy
   @SSLeay := LoadFunctionCLib(fn_SSLeay);    //Used by Indy
@@ -22673,7 +22792,12 @@ begin
   @SSL_CIPHER_get_version := LoadFunction(fn_SSL_CIPHER_get_version); //Used by Indy
   @SSL_CIPHER_get_bits  := LoadFunction(fn_SSL_CIPHER_get_bits);  //Used by Indy
   // Thread safe
-  @_CRYPTO_lock := LoadFunctionCLib(fn_CRYPTO_lock);  //Used by Indy
+  @_CRYPTO_lock := LoadFunctionCLib(fn_CRYPTO_lock{$IFDEF ANDROID}, False{$ENDIF});  //Used by Indy
+  {$IFDEF ANDROID}
+  if not Assigned(_CRYPTO_lock) then begin
+    @_CRYPTO_lock := @Indy_CRYPTO_lock;
+  end;
+  {$ENDIF}
   @_CRYPTO_num_locks := LoadFunctionCLib(fn_CRYPTO_num_locks); //Used by Indy
   @CRYPTO_set_locking_callback := LoadFunctionCLib(fn_CRYPTO_set_locking_callback); //Used by Indy
   {$IFNDEF WIN32_OR_WIN64}
@@ -22812,6 +22936,7 @@ we have to handle both cases.
   @_PEM_write_bio_X509 := LoadFunctionCLib(fn_PEM_write_bio_X509,False);
   @_PEM_write_bio_X509_REQ := LoadFunctionCLib(fn_PEM_write_bio_X509_REQ,False);
   @_PEM_write_bio_X509_CRL := LoadFunctionCLib( fn_PEM_write_bio_X509_CRL,False);
+  @_PEM_write_bio_RSAPrivateKey := LoadFunctionCLib(fn_PEM_write_bio_RSAPrivateKey,False);
   @_PEM_write_bio_RSAPublicKey := LoadFunctionCLib( fn_PEM_write_bio_RSAPublicKey,False);
   @_PEM_write_bio_DSAPrivateKey := LoadFunctionCLib( fn_PEM_write_bio_DSAPrivateKey,False);
   @_PEM_write_bio_PrivateKey := LoadFunctionCLib( fn_PEM_write_bio_PrivateKey,False);
@@ -22864,45 +22989,45 @@ we have to handle both cases.
   {$ifndef OPENSSL_NO_WHIRLPOOL}
   @EVP_whirlpool := LoadFunctionCLib(fn_EVP_whirlpool,False); //not available on Android
   {$endif}
-  @EVP_md_null := LoadFunctionCLib(fn_EVP_md_null);
+  @EVP_md_null := LoadFunctionCLib(fn_EVP_md_null, False);
   {$IFNDEF OPENSSL_NO_DES}
-  @EVP_des_ecb := LoadFunctionCLib(fn_EVP_des_ecb);
-  @EVP_des_ede := LoadFunctionCLib(fn_EVP_des_ede);
-  @EVP_des_ede3 := LoadFunctionCLib(fn_EVP_des_ede3);
-  @EVP_des_ede_ecb := LoadFunctionCLib(fn_EVP_des_ede_ecb);
-  @EVP_des_ede3_ecb := LoadFunctionCLib(fn_EVP_des_ede3_ecb);
-  @EVP_des_cfb64 := LoadFunctionCLib(fn_EVP_des_cfb64);
+  @EVP_des_ecb := LoadFunctionCLib(fn_EVP_des_ecb,False);
+  @EVP_des_ede := LoadFunctionCLib(fn_EVP_des_ede,False);
+  @EVP_des_ede3 := LoadFunctionCLib(fn_EVP_des_ede3,False);
+  @EVP_des_ede_ecb := LoadFunctionCLib(fn_EVP_des_ede_ecb,False);
+  @EVP_des_ede3_ecb := LoadFunctionCLib(fn_EVP_des_ede3_ecb,False);
+  @EVP_des_cfb64 := LoadFunctionCLib(fn_EVP_des_cfb64,False);
 //  # define EVP_des_cfb EVP_des_cfb64
 
-  @EVP_des_cfb1  := LoadFunctionCLib(fn_EVP_des_cfb1);
-  @EVP_des_cfb8  := LoadFunctionCLib(fn_EVP_des_cfb8);
-  @EVP_des_ede_cfb64 := LoadFunctionCLib(fn_EVP_des_ede_cfb64);
+  @EVP_des_cfb1  := LoadFunctionCLib(fn_EVP_des_cfb1,False);
+  @EVP_des_cfb8  := LoadFunctionCLib(fn_EVP_des_cfb8,False);
+  @EVP_des_ede_cfb64 := LoadFunctionCLib(fn_EVP_des_ede_cfb64,False);
 //#if 0
- // @EVP_des_ede_cfb1 := LoadFunctionCLib(fn_EVP_des_ede_cfb1);
- // @EVP_des_ede_cfb8 := LoadFunctionCLib(fn_EVP_des_ede_cfb8);
+ // @EVP_des_ede_cfb1 := LoadFunctionCLib(fn_EVP_des_ede_cfb1,False);
+ // @EVP_des_ede_cfb8 := LoadFunctionCLib(fn_EVP_des_ede_cfb8,False);
   //#endif
   @EVP_des_ede3_cfb64 := LoadFunctionCLib(fn_EVP_des_cfb64);
-  @EVP_des_ede3_cfb1 := LoadFunctionCLib(fn_EVP_des_cfb64);
-  @EVP_des_ede3_cfb8 := LoadFunctionCLib(fn_EVP_des_cfb64);
-  @EVP_des_ofb := LoadFunctionCLib(fn_EVP_des_cfb64);
-  @EVP_des_ede_ofb := LoadFunctionCLib(fn_EVP_des_cfb64);
-  @EVP_des_ede3_ofb := LoadFunctionCLib(fn_EVP_des_cfb64);
-  @EVP_des_cbc := LoadFunctionCLib(fn_EVP_des_cfb64);
-  @EVP_des_ede_cbc := LoadFunctionCLib(fn_EVP_des_cfb64);
-  @EVP_desx_cbc := LoadFunctionCLib(fn_EVP_des_cfb64);
+  @EVP_des_ede3_cfb1 := LoadFunctionCLib(fn_EVP_des_cfb64,False);
+  @EVP_des_ede3_cfb8 := LoadFunctionCLib(fn_EVP_des_cfb64,False);
+  @EVP_des_ofb := LoadFunctionCLib(fn_EVP_des_cfb64,False);
+  @EVP_des_ede_ofb := LoadFunctionCLib(fn_EVP_des_cfb64,False);
+  @EVP_des_ede3_ofb := LoadFunctionCLib(fn_EVP_des_cfb64,False);
+  @EVP_des_cbc := LoadFunctionCLib(fn_EVP_des_cfb64,False);
+  @EVP_des_ede_cbc := LoadFunctionCLib(fn_EVP_des_cfb64,False);
+  @EVP_desx_cbc := LoadFunctionCLib(fn_EVP_des_cfb64,False);
 //* This should now be supported through the dev_crypto ENGINE. But also, why are
 // * rc4 and md5 declarations made here inside a "NO_DES" precompiler branch? */
 //#if 0
   {$ifdef OPENSSL_OPENBSD_DEV_CRYPTO}
-  @EVP_dev_crypto_des_ede3_cbc := LoadFunctionCLib(fn_EVP_dev_crypto_des_ede3_cbc);
-  @EVP_dev_crypto_rc4 := LoadFunctionCLib(fn_EVP_dev_crypto_rc4);
-  @EVP_dev_crypto_md5 := LoadFunctionCLib(fn_EVP_dev_crypto_md5);
+  @EVP_dev_crypto_des_ede3_cbc := LoadFunctionCLib(fn_EVP_dev_crypto_des_ede3_cbc,False);
+  @EVP_dev_crypto_rc4 := LoadFunctionCLib(fn_EVP_dev_crypto_rc4,False);
+  @EVP_dev_crypto_md5 := LoadFunctionCLib(fn_EVP_dev_crypto_md5,False);
     {$endif}
 //#endif
   {$endif}
   {$ifndef OPENSSL_NO_RC4}
-  @EVP_rc4 := LoadFunctionCLib(fn_EVP_rc4);
-  @EVP_rc4_40 := LoadFunctionCLib(fn_EVP_rc4_40);
+  @EVP_rc4 := LoadFunctionCLib(fn_EVP_rc4,False);
+  @EVP_rc4_40 := LoadFunctionCLib(fn_EVP_rc4_40,False);
     {$ifndef OPENSSL_NO_MD5}
   @EVP_rc4_hmac_md5 := LoadFunctionCLib(fn_EVP_rc4_hmac_md5,False);
     {$endif}
@@ -22915,18 +23040,18 @@ we have to handle both cases.
   @EVP_idea_cbc := LoadFunctionCLib(fn_EVP_idea_cbc,False);
   {$endif}
   {$ifndef OPENSSL_NO_RC2}
-  @EVP_rc2_ecb := LoadFunctionCLib(fn_EVP_rc2_ecb);
-  @EVP_rc2_cbc := LoadFunctionCLib(fn_EVP_rc2_cbc);
-  @EVP_rc2_40_cbc := LoadFunctionCLib(fn_EVP_rc2_40_cbc);
-  @EVP_rc2_64_cbc := LoadFunctionCLib(fn_EVP_rc2_64_cbc);
-  @EVP_rc2_cfb64 := LoadFunctionCLib(fn_EVP_rc2_cfb64);
-  @EVP_rc2_ofb := LoadFunctionCLib(fn_EVP_rc2_ofb);
+  @EVP_rc2_ecb := LoadFunctionCLib(fn_EVP_rc2_ecb,False);
+  @EVP_rc2_cbc := LoadFunctionCLib(fn_EVP_rc2_cbc,False);
+  @EVP_rc2_40_cbc := LoadFunctionCLib(fn_EVP_rc2_40_cbc,False);
+  @EVP_rc2_64_cbc := LoadFunctionCLib(fn_EVP_rc2_64_cbc,False);
+  @EVP_rc2_cfb64 := LoadFunctionCLib(fn_EVP_rc2_cfb64,False);
+  @EVP_rc2_ofb := LoadFunctionCLib(fn_EVP_rc2_ofb, False);
   {$endif}
   {$ifndef OPENSSL_NO_BF}
-  @EVP_bf_ecb := LoadFunctionCLib(fn_EVP_bf_ecb);
-  @EVP_bf_cbc := LoadFunctionCLib(fn_EVP_bf_cbc);
-  @EVP_bf_cfb64 := LoadFunctionCLib(fn_EVP_bf_cfb64);
-  @EVP_bf_ofb := LoadFunctionCLib(fn_EVP_bf_ofb);
+  @EVP_bf_ecb := LoadFunctionCLib(fn_EVP_bf_ecb,False);
+  @EVP_bf_cbc := LoadFunctionCLib(fn_EVP_bf_cbc,False);
+  @EVP_bf_cfb64 := LoadFunctionCLib(fn_EVP_bf_cfb64,False);
+  @EVP_bf_ofb := LoadFunctionCLib(fn_EVP_bf_ofb,False);
   {$endif}
   {$ifndef OPENSSL_NO_CAST}
   //not available on Android
@@ -22936,38 +23061,38 @@ we have to handle both cases.
   @EVP_cast5_ofb := LoadFunctionCLib(fn_EVP_cast5_ofb,False);
   {$endif}
   {$ifndef OPENSSL_NO_RC5}
-  @EVP_rc5_32_12_16_cbc := LoadFunctionCLib(fn_EVP_rc5_32_12_16_cbc);
-  @EVP_rc5_32_12_16_ecb := LoadFunctionCLib(fn_EVP_rc5_32_12_16_ecb);
-  @EVP_rc5_32_12_16_cfb64 := LoadFunctionCLib(fn_EVP_rc5_32_12_16_cfb64);
-  @EVP_rc5_32_12_16_ofb := LoadFunctionCLib(fn_EVP_rc5_32_12_16_ofb);
+  @EVP_rc5_32_12_16_cbc := LoadFunctionCLib(fn_EVP_rc5_32_12_16_cbc,False);
+  @EVP_rc5_32_12_16_ecb := LoadFunctionCLib(fn_EVP_rc5_32_12_16_ecb,False);
+  @EVP_rc5_32_12_16_cfb64 := LoadFunctionCLib(fn_EVP_rc5_32_12_16_cfb64,False);
+  @EVP_rc5_32_12_16_ofb := LoadFunctionCLib(fn_EVP_rc5_32_12_16_ofb,False);
   {$endif}
   {$ifndef OPENSSL_NO_AES}
-  @EVP_aes_128_ecb := LoadFunctionCLib(fn_EVP_aes_128_ecb);
-  @EVP_aes_128_cbc := LoadFunctionCLib(fn_EVP_aes_128_cbc);
-  @EVP_aes_128_cfb1:= LoadFunctionCLib(fn_EVP_aes_128_cfb1);
-  @EVP_aes_128_cfb8:= LoadFunctionCLib(fn_EVP_aes_128_cfb8);
-  @EVP_aes_128_cfb128 := LoadFunctionCLib(fn_EVP_aes_128_cfb128);
-  @EVP_aes_128_ofb := LoadFunctionCLib(fn_EVP_aes_128_ofb);
+  @EVP_aes_128_ecb := LoadFunctionCLib(fn_EVP_aes_128_ecb,False);
+  @EVP_aes_128_cbc := LoadFunctionCLib(fn_EVP_aes_128_cbc,False);
+  @EVP_aes_128_cfb1:= LoadFunctionCLib(fn_EVP_aes_128_cfb1,False);
+  @EVP_aes_128_cfb8:= LoadFunctionCLib(fn_EVP_aes_128_cfb8,False);
+  @EVP_aes_128_cfb128 := LoadFunctionCLib(fn_EVP_aes_128_cfb128,False);
+  @EVP_aes_128_ofb := LoadFunctionCLib(fn_EVP_aes_128_ofb,False);
   @EVP_aes_128_ctr := LoadFunctionCLib(fn_EVP_aes_128_ctr,False);
   @EVP_aes_128_gcm := LoadFunctionCLib(fn_EVP_aes_128_gcm,False);
   @EVP_aes_128_ccm := LoadFunctionCLib(fn_EVP_aes_128_ccm,False);
   @EVP_aes_128_xts := LoadFunctionCLib(fn_EVP_aes_128_xts,False);
-  @EVP_aes_192_ecb := LoadFunctionCLib(fn_EVP_aes_192_ecb);
-  @EVP_aes_192_cbc := LoadFunctionCLib(fn_EVP_aes_192_cbc);
-  @EVP_aes_192_cfb1 := LoadFunctionCLib(fn_EVP_aes_192_cfb1);
-  @EVP_aes_192_cfb1 := LoadFunctionCLib(fn_EVP_aes_192_cfb1);
-  @EVP_aes_192_cfb128 := LoadFunctionCLib(fn_EVP_aes_192_cfb128);
+  @EVP_aes_192_ecb := LoadFunctionCLib(fn_EVP_aes_192_ecb,False);
+  @EVP_aes_192_cbc := LoadFunctionCLib(fn_EVP_aes_192_cbc,False);
+  @EVP_aes_192_cfb1 := LoadFunctionCLib(fn_EVP_aes_192_cfb1,False);
+  @EVP_aes_192_cfb1 := LoadFunctionCLib(fn_EVP_aes_192_cfb1,False);
+  @EVP_aes_192_cfb128 := LoadFunctionCLib(fn_EVP_aes_192_cfb128,False);
 
-  @EVP_aes_192_ofb := LoadFunctionCLib(fn_EVP_aes_192_ofb);
+  @EVP_aes_192_ofb := LoadFunctionCLib(fn_EVP_aes_192_ofb,False);
   @EVP_aes_192_ctr := LoadFunctionCLib(fn_EVP_aes_192_ctr,False);
   @EVP_aes_192_gcm := LoadFunctionCLib(fn_EVP_aes_192_gcm,False);
   @EVP_aes_192_ccm := LoadFunctionCLib(fn_EVP_aes_192_ccm,False);
-  @EVP_aes_256_ecb := LoadFunctionCLib(fn_EVP_aes_256_ecb);
-  @EVP_aes_256_cbc := LoadFunctionCLib(fn_EVP_aes_256_cbc);
-  @EVP_aes_256_cfb1 := LoadFunctionCLib(fn_EVP_aes_256_cfb1);
-  @EVP_aes_256_cfb8 := LoadFunctionCLib(fn_EVP_aes_256_cfb8);
-  @EVP_aes_256_cfb128 := LoadFunctionCLib(fn_EVP_aes_256_cfb128);
-  @EVP_aes_256_ofb := LoadFunctionCLib(fn_EVP_aes_256_ofb);
+  @EVP_aes_256_ecb := LoadFunctionCLib(fn_EVP_aes_256_ecb,False);
+  @EVP_aes_256_cbc := LoadFunctionCLib(fn_EVP_aes_256_cbc,False);
+  @EVP_aes_256_cfb1 := LoadFunctionCLib(fn_EVP_aes_256_cfb1,False);
+  @EVP_aes_256_cfb8 := LoadFunctionCLib(fn_EVP_aes_256_cfb8,False);
+  @EVP_aes_256_cfb128 := LoadFunctionCLib(fn_EVP_aes_256_cfb128,False);
+  @EVP_aes_256_ofb := LoadFunctionCLib(fn_EVP_aes_256_ofb,False);
   @EVP_aes_256_ctr := LoadFunctionCLib(fn_EVP_aes_256_ctr,False);
   @EVP_aes_256_gcm := LoadFunctionCLib(fn_EVP_aes_256_gcm,False);
   @EVP_aes_256_ccm := LoadFunctionCLib(fn_EVP_aes_256_ccm,False);
@@ -22980,32 +23105,32 @@ we have to handle both cases.
     {$endif}
   {$endif}
   {$ifndef OPENSSL_NO_CAMELLIA}
-  @EVP_camellia_128_ecb  := LoadFunctionCLib(fn_EVP_camellia_128_ecb);
-  @EVP_camellia_128_cbc := LoadFunctionCLib(fn_EVP_camellia_128_cbc);
-  @EVP_camellia_128_cfb1 := LoadFunctionCLib(fn_EVP_camellia_128_cfb1);
-  @EVP_camellia_128_cfb8 := LoadFunctionCLib(fn_EVP_camellia_128_cfb8);
-  @EVP_camellia_128_cfb128 := LoadFunctionCLib(fn_EVP_camellia_128_cfb12);
-  @EVP_camellia_128_ofb := LoadFunctionCLib(fn_EVP_camellia_128_ofb);
-  @EVP_camellia_192_ecb := LoadFunctionCLib(fn_EVP_camellia_192_ecb);
+  @EVP_camellia_128_ecb  := LoadFunctionCLib(fn_EVP_camellia_128_ecb, False);
+  @EVP_camellia_128_cbc := LoadFunctionCLib(fn_EVP_camellia_128_cbc, False);
+  @EVP_camellia_128_cfb1 := LoadFunctionCLib(fn_EVP_camellia_128_cfb1, False);
+  @EVP_camellia_128_cfb8 := LoadFunctionCLib(fn_EVP_camellia_128_cfb8, False);
+  @EVP_camellia_128_cfb128 := LoadFunctionCLib(fn_EVP_camellia_128_cfb12, False);
+  @EVP_camellia_128_ofb := LoadFunctionCLib(fn_EVP_camellia_128_ofb, False);
+  @EVP_camellia_192_ecb := LoadFunctionCLib(fn_EVP_camellia_192_ecb, False);
 
-  @EVP_camellia_192_cbc := LoadFunctionCLib(fn_EVP_camellia_192_cbc);
-  @EVP_camellia_192_cfb1 := LoadFunctionCLib(fn_EVP_camellia_192_cfb1);
-  @EVP_camellia_192_cfb8 := LoadFunctionCLib(fn_EVP_camellia_192_cfb8);
-  @EVP_camellia_192_cfb128 := LoadFunctionCLib(fn_EVP_camellia_192_cfb128);
-  @EVP_camellia_192_ofb := LoadFunctionCLib(fn_EVP_camellia_192_ofb);
-  @EVP_camellia_256_ecb := LoadFunctionCLib(fn_EVP_camellia_256_ecb);
-  @EVP_camellia_256_cbc := LoadFunctionCLib(fn_EVP_camellia_256_cbc);
-  @EVP_camellia_256_cfb1 := LoadFunctionCLib(fn_EVP_camellia_256_cfb1);
-  @EVP_camellia_256_cfb8 := LoadFunctionCLib(fn_EVP_camellia_256_cfb8);
-  @EVP_camellia_256_cfb128 := LoadFunctionCLib(fn_EVP_camellia_256_cfb128);
-  @EVP_camellia_256_ofb := LoadFunctionCLib(fn_EVP_camellia_256_ofb);
+  @EVP_camellia_192_cbc := LoadFunctionCLib(fn_EVP_camellia_192_cbc,False);
+  @EVP_camellia_192_cfb1 := LoadFunctionCLib(fn_EVP_camellia_192_cfb1,False);
+  @EVP_camellia_192_cfb8 := LoadFunctionCLib(fn_EVP_camellia_192_cfb8,False);
+  @EVP_camellia_192_cfb128 := LoadFunctionCLib(fn_EVP_camellia_192_cfb128,False);
+  @EVP_camellia_192_ofb := LoadFunctionCLib(fn_EVP_camellia_192_ofb,False);
+  @EVP_camellia_256_ecb := LoadFunctionCLib(fn_EVP_camellia_256_ecb,False);
+  @EVP_camellia_256_cbc := LoadFunctionCLib(fn_EVP_camellia_256_cbc,False);
+  @EVP_camellia_256_cfb1 := LoadFunctionCLib(fn_EVP_camellia_256_cfb1,False);
+  @EVP_camellia_256_cfb8 := LoadFunctionCLib(fn_EVP_camellia_256_cfb8,False);
+  @EVP_camellia_256_cfb128 := LoadFunctionCLib(fn_EVP_camellia_256_cfb128,False);
+  @EVP_camellia_256_ofb := LoadFunctionCLib(fn_EVP_camellia_256_ofb,False);
   {$endif}
 
   {$ifndef OPENSSL_NO_SEED}
-  @EVP_seed_ecb := LoadFunctionCLib(fn_EVP_seed_ecb);
-  @EVP_seed_cbc := LoadFunctionCLib(fn_EVP_seed_cbc);
-  @EVP_seed_cfb128 := LoadFunctionCLib(fn_EVP_seed_cfb128);
-  @EVP_seed_ofb := LoadFunctionCLib(fn_EVP_seed_ofb);
+  @EVP_seed_ecb := LoadFunctionCLib(fn_EVP_seed_ecb,False);
+  @EVP_seed_cbc := LoadFunctionCLib(fn_EVP_seed_cbc,False);
+  @EVP_seed_cfb128 := LoadFunctionCLib(fn_EVP_seed_cfb128,False);
+  @EVP_seed_ofb := LoadFunctionCLib(fn_EVP_seed_ofb,False);
   {$endif}
 
   @EVP_MD_CTX_init := LoadFunctionCLib(fn_EVP_MD_CTX_init);
@@ -23015,23 +23140,23 @@ we have to handle both cases.
   @EVP_DigestFinal_ex := LoadFunctionCLib(fn_EVP_DigestFinal_ex);
 
 
-  @EVP_EncryptInit := LoadFunctionCLib(fn_EVP_EncryptInit);
-  @EVP_EncryptInit_ex := LoadFunctionCLib(fn_EVP_EncryptInit_ex);
+  @EVP_EncryptInit := LoadFunctionCLib(fn_EVP_EncryptInit,False);
+  @EVP_EncryptInit_ex := LoadFunctionCLib(fn_EVP_EncryptInit_ex,False);
   @EVP_EncryptUpdate := LoadFunctionCLib(fn_EVP_EncryptUpdate);
-  @EVP_EncryptFinal_ex := LoadFunctionCLib(fn_EVP_EncryptFinal_ex);
-  @EVP_EncryptFinal := LoadFunctionCLib(fn_EVP_EncryptFinal);
+  @EVP_EncryptFinal_ex := LoadFunctionCLib(fn_EVP_EncryptFinal_ex,False);
+  @EVP_EncryptFinal := LoadFunctionCLib(fn_EVP_EncryptFinal,False);
 
 
 
-  @EVP_DecryptInit := LoadFunctionCLib(fn_EVP_DecryptInit);
-  @EVP_DecryptInit_ex := LoadFunctionCLib(fn_EVP_DecryptInit_ex);
+  @EVP_DecryptInit := LoadFunctionCLib(fn_EVP_DecryptInit,False);
+  @EVP_DecryptInit_ex := LoadFunctionCLib(fn_EVP_DecryptInit_ex,False);
   @EVP_DecryptUpdate := LoadFunctionCLib(fn_EVP_DecryptUpdate);
-  @EVP_DecryptFinal := LoadFunctionCLib(fn_EVP_DecryptFinal);
-  @EVP_DecryptFinal_ex := LoadFunctionCLib(fn_EVP_DecryptFinal_ex);
-  @EVP_CipherInit := LoadFunctionCLib(fn_EVP_CipherInit);
-  @EVP_CipherInit_ex  := LoadFunctionCLib(fn_EVP_CipherInit_ex);
-  @EVP_CipherUpdate  := LoadFunctionCLib(fn_EVP_CipherUpdate);
-  @EVP_CipherFinal  := LoadFunctionCLib(fn_EVP_CipherFinal);
+  @EVP_DecryptFinal := LoadFunctionCLib(fn_EVP_DecryptFinal,False);
+  @EVP_DecryptFinal_ex := LoadFunctionCLib(fn_EVP_DecryptFinal_ex,False);
+  @EVP_CipherInit := LoadFunctionCLib(fn_EVP_CipherInit,False);
+  @EVP_CipherInit_ex  := LoadFunctionCLib(fn_EVP_CipherInit_ex,False);
+  @EVP_CipherUpdate  := LoadFunctionCLib(fn_EVP_CipherUpdate,False);
+  @EVP_CipherFinal  := LoadFunctionCLib(fn_EVP_CipherFinal,False);
   @EVP_CipherFinal_ex  := LoadFunctionCLib(fn_EVP_CipherFinal_ex,False);
   @EVP_SignFinal := LoadFunctionCLib(fn_EVP_SignFinal,False);
   @EVP_VerifyFinal := LoadFunctionCLib(fn_EVP_VerifyFinal,False);
@@ -23039,7 +23164,7 @@ we have to handle both cases.
   @EVP_DigestSignFinal := LoadFunctionCLib(fn_EVP_DigestSignFinal,False);
   @EVP_DigestVerifyInit := LoadFunctionCLib(fn_EVP_DigestVerifyInit,False);
   @EVP_DigestVerifyFinal := LoadFunctionCLib(fn_EVP_DigestVerifyFinal,False);
-  @EVP_OpenInit := LoadFunctionCLib(fn_EVP_OpenInit);
+  @EVP_OpenInit := LoadFunctionCLib(fn_EVP_OpenInit,False);
   @EVP_OpenFinal := LoadFunctionCLib(fn_EVP_OpenFinal,False);
   @EVP_SealInit := LoadFunctionCLib(fn_EVP_SealInit,False);
   @EVP_SealFinal := LoadFunctionCLib(fn_EVP_SealFinal,False);
@@ -23151,16 +23276,16 @@ we have to handle both cases.
   @EVP_CIPHER_set_asn1_iv := LoadFunctionCLib(fn_EVP_CIPHER_set_asn1_iv,False);
   @EVP_CIPHER_get_asn1_iv := LoadFunctionCLib(fn_EVP_CIPHER_get_asn1_iv,False);
   @PKCS5_PBE_keyivgen := LoadFunctionCLib(fn_PKCS5_PBE_keyivgen,False);
-  @PKCS5_PBKDF2_HMAC_SHA1 := LoadFunctionCLib(fn_PKCS5_PBKDF2_HMAC_SHA1);
+  @PKCS5_PBKDF2_HMAC_SHA1 := LoadFunctionCLib(fn_PKCS5_PBKDF2_HMAC_SHA1,False);
   @PKCS5_PBKDF2_HMAC := LoadFunctionCLib(fn_PKCS5_PBKDF2_HMAC,False);
   @PKCS5_v2_PBE_keyivgen := LoadFunctionCLib(fn_PKCS5_v2_PBE_keyivgen,False);
   @PKCS5_PBE_add := LoadFunctionCLib(fn_PKCS5_PBE_add,False);
   @EVP_PBE_CipherInit := LoadFunctionCLib(fn_EVP_PBE_CipherInit,False);
 
   @EVP_PBE_alg_add_type := LoadFunctionCLib(fn_EVP_PBE_alg_add_type,False);
-  @EVP_PBE_alg_add := LoadFunctionCLib(fn_EVP_PBE_alg_add);
+  @EVP_PBE_alg_add := LoadFunctionCLib(fn_EVP_PBE_alg_add,False);
   @EVP_PBE_find := LoadFunctionCLib(fn_EVP_PBE_find,False);
-  @EVP_PBE_cleanup := LoadFunctionCLib(fn_EVP_PBE_cleanup);
+  @EVP_PBE_cleanup := LoadFunctionCLib(fn_EVP_PBE_cleanup,False);
   @EVP_PKEY_asn1_get_count := LoadFunctionCLib(fn_EVP_PKEY_asn1_get_count,False);
   @EVP_PKEY_asn1_get0 := LoadFunctionCLib(fn_EVP_PKEY_asn1_get0,False);
   @EVP_PKEY_asn1_find := LoadFunctionCLib(fn_EVP_PKEY_asn1_find,False);
@@ -23205,9 +23330,9 @@ we have to handle both cases.
   @EVP_PKEY_verify_recover_init := LoadFunctionCLib(fn_EVP_PKEY_verify_recover_init,False);
   @EVP_PKEY_verify_recover := LoadFunctionCLib(fn_EVP_PKEY_verify_recover,False);
   @EVP_PKEY_encrypt_init := LoadFunctionCLib(fn_EVP_PKEY_encrypt_init,False);
-  @EVP_PKEY_encrypt := LoadFunctionCLib(fn_EVP_PKEY_encrypt);
+  @EVP_PKEY_encrypt := LoadFunctionCLib(fn_EVP_PKEY_encrypt,False);
   @EVP_PKEY_decrypt_init := LoadFunctionCLib(fn_EVP_PKEY_decrypt_init,False);
-  @EVP_PKEY_decrypt := LoadFunctionCLib(fn_EVP_PKEY_decrypt);
+  @EVP_PKEY_decrypt := LoadFunctionCLib(fn_EVP_PKEY_decrypt,False);
   @EVP_PKEY_derive_init := LoadFunctionCLib(fn_EVP_PKEY_derive_init,False);
   @EVP_PKEY_derive_set_peer := LoadFunctionCLib(fn_EVP_PKEY_derive_set_peer,False);
   @EVP_PKEY_derive := LoadFunctionCLib(fn_EVP_PKEY_derive,False);
@@ -23311,6 +23436,7 @@ begin
   @SSL_CTX_use_PrivateKey := nil;
   @SSL_CTX_use_certificate := nil;
   @SSL_CTX_use_certificate_file := nil;
+  SSL_CTX_use_certificate_chain_file := nil;
   @SSL_load_error_strings := nil;
   @SSL_state_string_long := nil;
   @SSL_load_error_strings := nil;
@@ -24035,7 +24161,7 @@ begin
            Assigned(CRYPTO_free) then
         begin
           LStack := SSL_COMP_get_compression_methods;
-          sk_pop_free(LStack, @CRYPTO_free);
+          sk_pop_free(LStack, CRYPTO_free);
         end;
       end;
     end;
@@ -24630,12 +24756,6 @@ begin
 	Result := SSL_ctrl(ssl,SSL_CTRL_SET_TMP_ECDH,0,ecdh);
 end;
 
-function SSL_CTX_add_extra_chain_cert(ctx : PSSL_CTX; x509 : PX509) : TIdC_LONG;
- {$IFDEF USE_INLINE} inline; {$ENDIF}
-begin
-	Result := SSL_CTX_ctrl(ctx,SSL_CTRL_EXTRA_CHAIN_CERT,0,x509);
-end;
-
 {$IFNDEF OPENSSL_NO_TLSEXT}
 function SSL_set_tlsext_host_name(s : PSSL; name : string) : TIdC_LONG;
  {$IFDEF USE_INLINE} inline; {$ENDIF}
@@ -24662,7 +24782,11 @@ end;
 function SSL_set_tlsext_debug_callback(ssl : PSSL; cb : SSL_callback_ctrl_fp) : TIdC_LONG;
  {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
-  Result := SSL_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_DEBUG_CB,cb);
+  if Assigned(SSL_callback_ctrl) then begin
+    Result := SSL_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_DEBUG_CB,cb);
+  end else begin
+    Result := ssl.method.ssl_callback_ctrl(ssl, SSL_CTRL_SET_TLSEXT_DEBUG_CB, SSL_METHOD_PROC(cb));
+  end;
 end;
 
 function SSL_set_tlsext_debug_arg(ssl : PSSL; arg : Pointer) : TIdC_LONG;
@@ -24753,6 +24877,66 @@ function SSL_CTX_set_tlsext_ticket_key_cb(ssl : PSSL_CTX; cb : TSSL_CTX_set_tlse
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := SSL_CTX_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB,SSL_callback_ctrl_fp(cb));
+end;
+
+function SSL_CTX_add_extra_chain_cert(ctx : PSSL_CTX; x509 : PX509) : TIdC_LONG;
+ {$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+	Result := SSL_CTX_ctrl(ctx,SSL_CTRL_EXTRA_CHAIN_CERT,0,x509);
+end;
+
+function SSL_CTX_get_extra_chain_certs(ctx : PSSL_CTX; var px509 : px509) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_ctrl(ctx,SSL_CTRL_GET_EXTRA_CHAIN_CERTS,0,px509);
+end;
+
+function SSL_CTX_get_extra_chain_certs_only(ctx: PSSL_CTX;var PX509 :PX509) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_ctrl(ctx,SSL_CTRL_GET_EXTRA_CHAIN_CERTS,1,px509);
+end;
+
+function SSL_CTX_clear_extra_chain_certs(ctx : PSSL_CTX) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_ctrl(ctx,SSL_CTRL_CLEAR_EXTRA_CHAIN_CERTS,0,nil);
+end;
+
+function SSL_CTX_set0_chain(ctx:PSSL_CTX; sk : PSTACK_OF_X509) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_ctrl(ctx,SSL_CTRL_CHAIN,0,sk);
+end;
+
+function SSL_CTX_set1_chain(ctx:PSSL_CTX; sk : PSTACK_OF_X509) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_ctrl(ctx,SSL_CTRL_CHAIN,1,sk);
+end;
+
+function SSL_CTX_add0_chain_cert(ctx : PSSL_CTX; x509 : PX509) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_ctrl(ctx,SSL_CTRL_CHAIN_CERT,0,x509);
+end;
+
+function SSL_CTX_add1_chain_cert(ctx : PSSL_CTX; x509 : PX509) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_ctrl(ctx,SSL_CTRL_CHAIN_CERT,1,x509);
+end;
+
+function SSL_CTX_get0_chain_certs(ctx :PSSL_CTX; var px509 :PX509) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_ctrl(ctx,SSL_CTRL_GET_CHAIN_CERTS,0,px509)
+end;
+
+function SSL_CTX_clear_chain_certs(ctx :PSSL_CTX) : TIdC_LONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
+begin
+  Result := SSL_CTX_set0_chain(ctx,nil);
 end;
 
 {$ifndef OPENSSL_NO_HEARTBEATS}
@@ -25293,69 +25477,51 @@ end;
 
 function PEM_read_bio_X509_REQ(bp :PBIO; x : PPX509_REQ; cb :ppem_password_cb; u: Pointer) : PX509_REQ;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
-//PEM_ASN1_read_bio( (char *(*)())d2i_X509_REQ,PEM_STRING_X509_REQ,bp,(char **)x,cb,u)
 begin
   Result := PEM_ASN1_read_bio(d2i_of_void(d2i_X509_REQ),PEM_STRING_X509_REQ,bp, Pointer(x), cb, u);
 end;
 
-//#define	PEM_read_bio_X509_CRL(bp,x,cb,u) (X509_CRL *)PEM_ASN1_read_bio( \
-//	(char *(*)())d2i_X509_CRL,PEM_STRING_X509_CRL,bp,(char **)x,cb,u)
 function PEM_read_bio_X509_CRL(bp : PBIO; x : PPX509_CRL;cb : ppem_password_cb; u: Pointer) : PX509_CRL;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := PEM_ASN1_read_bio(d2i_of_void(d2i_X509_CRL), PEM_STRING_X509_CRL, bp, Pointer(x), cb, u);
 end;
 
-//#define	PEM_read_bio_RSAPrivateKey(bp,x,cb,u) (RSA *)PEM_ASN1_read_bio( \
-//	(char *(*)())d2i_RSAPrivateKey,PEM_STRING_RSA,bp,(char **)x,cb,u)
 function PEM_read_bio_RSAPrivateKey(bp : PBIO; x : PPRSA; cb : ppem_password_cb; u: Pointer) : PRSA;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := PEM_ASN1_read_bio(d2i_of_void(d2i_RSAPrivateKey), PEM_STRING_RSA, bp, Pointer(x), cb, u);
 end;
 
-//#define	PEM_read_bio_RSAPublicKey(bp,x,cb,u) (RSA *)PEM_ASN1_read_bio( \
-//	(char *(*)())d2i_RSAPublicKey,PEM_STRING_RSA_PUBLIC,bp,(char **)x,cb,u)
 function PEM_read_bio_RSAPublicKey(bp : PBIO; x : PPRSA; cb : ppem_password_cb; u: Pointer) : PRSA;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := PEM_ASN1_read_bio(d2i_of_void(d2i_RSAPublicKey),PEM_STRING_RSA_PUBLIC, bp, Pointer(x),cb, u);
 end;
 
-//#define	PEM_read_bio_DSAPrivateKey(bp,x,cb,u) (DSA *)PEM_ASN1_read_bio( \
-//	(char *(*)())d2i_DSAPrivateKey,PEM_STRING_DSA,bp,(char **)x,cb,u)
 function PEM_read_bio_DSAPrivateKey(bp : PBIO; x : PPDSA; cb : ppem_password_cb; u : Pointer) : PDSA;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := PEM_ASN1_read_bio( d2i_of_void(d2i_DSAPrivateKey),PEM_STRING_DSA,bp,Pointer(x),cb,u);
 end;
 
-//#define	PEM_read_bio_PrivateKey(bp,x,cb,u) (EVP_PKEY *)PEM_ASN1_read_bio( \
-//	(char *(*)())d2i_PrivateKey,PEM_STRING_EVP_PKEY,bp,(char **)x,cb,u)
 function PEM_read_bio_PrivateKey(bp : PBIO; x : PPEVP_PKEY; cb : ppem_password_cb; u : Pointer) : PEVP_PKEY;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := PEM_ASN1_read_bio( d2i_of_void(d2i_PrivateKey), PEM_STRING_EVP_PKEY, bp, Pointer(x),cb, u);
 end;
 
-//#define	PEM_read_bio_PKCS7(bp,x,cb,u) (PKCS7 *)PEM_ASN1_read_bio( \
-//	(char *(*)())d2i_PKCS7,PEM_STRING_PKCS7,bp,(char **)x,cb,u)
 function PEM_read_bio_PKCS7(bp : PBIO; x : PPPKCS7; cb : ppem_password_cb; u : Pointer) : PPKCS7;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := PEM_ASN1_read_bio( d2i_of_void(d2i_PKCS7), PEM_STRING_PKCS7,bp,Pointer(x),cb, u);
 end;
 
-//#define	PEM_read_bio_DHparams(bp,x,cb,u) (DH *)PEM_ASN1_read_bio( \
-//	(char *(*)())d2i_DHparams,PEM_STRING_DHPARAMS,bp,(char **)x,cb,u)
 function PEM_read_bio_DHparams(bp : PBIO; x : PPDH; cb : ppem_password_cb; u : Pointer) : PDH;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := PEM_ASN1_read_bio(d2i_of_void(d2i_DHparams),PEM_STRING_DHPARAMS,bp,Pointer(x),cb,u);
 end;
-
-//#define	PEM_read_bio_DSAparams(bp,x,cb,u) (DSA *)PEM_ASN1_read_bio( \
-//	(char *(*)())d2i_DSAparams,PEM_STRING_DSAPARAMS,bp,(char **)x,cb,u)
 
 function PEM_read_bio_DSAparams(bp : PBIO; x : PPDSA; cb : ppem_password_cb; u : Pointer) : PDSA;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
@@ -25363,10 +25529,6 @@ begin
   Result := PEM_ASN1_read_bio( d2i_of_void(d2i_DSAparams),PEM_STRING_DSAPARAMS,bp,Pointer(x),cb,u);
 end;
 
-//#define PEM_read_bio_NETSCAPE_CERT_SEQUENCE(bp,x,cb,u) \
-//		(NETSCAPE_CERT_SEQUENCE *)PEM_ASN1_read_bio( \
-//        (char *(*)())d2i_NETSCAPE_CERT_SEQUENCE,PEM_STRING_X509,bp,\
-//							(char **)x,cb,u)
 function PEM_read_bio_NETSCAPE_CERT_SEQUENCE(bp : PBIO; x : PPNETSCAPE_CERT_SEQUENCE;
   cb : ppem_password_cb; u : Pointer) : PNETSCAPE_CERT_SEQUENCE;
 {$IFDEF USE_INLINE} inline; {$ENDIF}
@@ -25504,6 +25666,7 @@ begin
 end;
 
 function PEM_read_bio_DSAPrivateKey(bp : PBIO; x : PPDSA; cb : ppem_password_cb; u : Pointer) : PDSA;{$IFDEF USE_INLINE} inline; {$ENDIF}
+{$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := _PEM_read_bio_DSAPrivateKey(bp, x, cb, u);
 end;
@@ -25988,12 +26151,8 @@ begin
   ctx.db := nil;
 end;
 
-///* Borland C seems too stupid to be able to shift and do longs in
-// * the pre-processor :-( */
-//#define ERR_PACK(l,f,r)		(((((unsigned long)l)&0xffL)*0x1000000)| \
-//				((((unsigned long)f)&0xfffL)*0x1000)| \
-//				((((unsigned long)r)&0xfffL)))
 function ERR_PACK(l, f, r : TIdC_INT) : TIdC_ULONG;
+{$IFDEF USE_INLINE} inline; {$ENDIF}
 begin
   Result := ((TIdC_ULONG(l) and $ff) * $1000000) or
     ((TIdC_ULONG(f) and $fff) * $1000) or
@@ -26265,8 +26424,6 @@ function X509_LOOKUP_add_dir(x : PX509_LOOKUP; name : PIdAnsiChar; _type : TIdC_
 begin
   Result := X509_LOOKUP_ctrl(x, X509_L_ADD_DIR, name, _type, nil);
 end;
-
-
 
 function RAND_bytes(buf : PIdAnsiChar; num : integer) : integer;
 begin

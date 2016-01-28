@@ -390,8 +390,8 @@ type
     procedure CreateIOHandler(ABaseType: TIdIOHandlerClass = nil);
     procedure CheckForGracefulDisconnect(ARaiseExceptionIfDisconnected: Boolean = True); virtual;
     //
-    function CheckResponse(const AResponse: SmallInt;
-     const AAllowedResponses: array of SmallInt): SmallInt; overload; virtual;
+    function CheckResponse(const AResponse: Int16;
+     const AAllowedResponses: array of Int16): Int16; overload; virtual;
     function CheckResponse(const AResponse, AAllowedResponse: string): string; overload; virtual;
     //
     function Connected: Boolean; virtual;
@@ -411,10 +411,10 @@ type
     //
     // Seperate one for singles as one of the older Delphi compilers cannot
     // match a single number into an array. IIRC newer ones do.
-    function GetResponse(const AAllowedResponse: SmallInt = -1;
-      AEncoding: IIdTextEncoding = nil): SmallInt; overload;
-    function GetResponse(const AAllowedResponses: array of SmallInt;
-      AEncoding: IIdTextEncoding = nil): SmallInt; overload; virtual;
+    function GetResponse(const AAllowedResponse: Int16 = -1;
+      AEncoding: IIdTextEncoding = nil): Int16; overload;
+    function GetResponse(const AAllowedResponses: array of Int16;
+      AEncoding: IIdTextEncoding = nil): Int16; overload; virtual;
     // No array type for strings as ones that use strings are usually bastard
     // protocols like POP3/IMAP which dont include proper substatus anyways.
     //
@@ -429,10 +429,10 @@ type
     procedure RaiseExceptionForLastCmdResult(AException: TClassIdException);
      overload; virtual;
     // These are extended GetResponses, so see the comments for GetResponse
-    function SendCmd(AOut: string; const AResponse: SmallInt = -1;
-      AEncoding: IIdTextEncoding = nil): SmallInt; overload;
-    function SendCmd(AOut: string; const AResponse: array of SmallInt;
-      AEncoding: IIdTextEncoding = nil): SmallInt; overload; virtual;
+    function SendCmd(AOut: string; const AResponse: Int16 = -1;
+      AEncoding: IIdTextEncoding = nil): Int16; overload;
+    function SendCmd(AOut: string; const AResponse: array of Int16;
+      AEncoding: IIdTextEncoding = nil): Int16; overload; virtual;
     function SendCmd(AOut: string; const AResponse: string;
       AEncoding: IIdTextEncoding = nil): string; overload;
     //
@@ -479,7 +479,7 @@ end;
 procedure TIdTCPConnection.CreateIOHandler(ABaseType:TIdIOHandlerClass=nil);
 begin
   if Connected then begin
-    EIdException.Toss(RSIOHandlerCannotChange);
+    raise EIdException.Create(RSIOHandlerCannotChange);
   end;
   if Assigned(ABaseType) then begin
     IOHandler := TIdIOHandler.MakeIOHandler(ABaseType, Self);
@@ -538,8 +538,12 @@ begin
       // if DisconnectNotifyPeer() has been overridden and then call Connected()
       // to maintain existing behavior...
       //
-      if Connected then begin
-        DisconnectNotifyPeer;
+      try
+        if Connected then begin
+          DisconnectNotifyPeer;
+        end;
+      except
+        // TODO: maybe shallow only EIdConnClosedGracefully and EIdSocketError?
       end;
     end;
   finally
@@ -582,8 +586,8 @@ begin
   end;
 end;
 
-function TIdTCPConnection.GetResponse(const AAllowedResponses: array of SmallInt;
-  AEncoding: IIdTextEncoding = nil): SmallInt;
+function TIdTCPConnection.GetResponse(const AAllowedResponses: array of Int16;
+  AEncoding: IIdTextEncoding = nil): Int16;
 begin
   GetInternalResponse(AEncoding);
   Result := CheckResponse(LastCmdResult.NumericCode, AAllowedResponses);
@@ -600,8 +604,8 @@ begin
   LastCmdResult.RaiseReplyError;
 end;
 
-function TIdTCPConnection.SendCmd(AOut: string; const AResponse: Array of SmallInt;
-  AEncoding: IIdTextEncoding = nil): SmallInt;
+function TIdTCPConnection.SendCmd(AOut: string; const AResponse: Array of Int16;
+  AEncoding: IIdTextEncoding = nil): Int16;
 begin
   CheckConnected;
   PrepareCmd(AOut);
@@ -653,7 +657,7 @@ begin
     //
     if Assigned(LIOHandler) and Assigned(AValue) then begin
       if Assigned(LIOHandler.Intercept) and (LIOHandler.Intercept <> AValue) then begin
-        EIdException.Toss(RSInterceptIsDifferent);
+        raise EIdException.Create(RSInterceptIsDifferent);
       end;
     end;
 
@@ -709,7 +713,7 @@ begin
       LOtherIntercept := AValue.Intercept;
       if Assigned(LOtherIntercept) then begin
         if LOtherIntercept <> LIntercept then begin
-          EIdException.Toss(RSInterceptIsDifferent);
+          raise EIdException.Create(RSInterceptIsDifferent);
         end;
         {$IFDEF USE_OBJECT_ARC}LOtherIntercept := nil;{$ENDIF}
       end;
@@ -790,8 +794,8 @@ begin
   end;
 end;
 
-function TIdTCPConnection.SendCmd(AOut: string; const AResponse: SmallInt = -1;
-  AEncoding: IIdTextEncoding = nil): SmallInt;
+function TIdTCPConnection.SendCmd(AOut: string; const AResponse: Int16 = -1;
+  AEncoding: IIdTextEncoding = nil): Int16;
 begin
   if AResponse < 0 then begin
     Result := SendCmd(AOut, [], AEncoding);
@@ -813,8 +817,8 @@ begin
   end;
 end;
 
-function TIdTCPConnection.CheckResponse(const AResponse: SmallInt;
- const AAllowedResponses: array of SmallInt): SmallInt;
+function TIdTCPConnection.CheckResponse(const AResponse: Int16;
+ const AAllowedResponses: array of Int16): Int16;
 var
   i: Integer;
   LResponseFound: Boolean;
@@ -865,8 +869,8 @@ begin
   IOHandler.WriteRFCStrings(AStrings, True);
 end;
 
-function TIdTCPConnection.GetResponse(const AAllowedResponse: SmallInt = -1;
-  AEncoding: IIdTextEncoding = nil): SmallInt;
+function TIdTCPConnection.GetResponse(const AAllowedResponse: Int16 = -1;
+  AEncoding: IIdTextEncoding = nil): Int16;
 begin
   if AAllowedResponse < 0 then begin
     Result := GetResponse([], AEncoding);
@@ -928,7 +932,7 @@ end;
 procedure TIdTCPConnection.CheckConnected;
 begin
   if not Assigned(IOHandler) then begin
-    EIdNotConnected.Toss(RSNotConnected);
+    raise EIdNotConnected.Create(RSNotConnected);
   end;
 end;
 

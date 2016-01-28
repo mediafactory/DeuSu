@@ -89,6 +89,7 @@ interface
 
 uses
   Classes,
+  IdGlobal,
   IdFTPList;
 
 type
@@ -125,7 +126,7 @@ type
     FUnixOtherPermissions: string;
     FUnixinode : Integer;
 
-    FWinAttribs : Cardinal;
+    FWinAttribs : UInt32;
     //an error has been reported in the DIR listing itself for an item
     FDirError : Boolean;
 
@@ -153,7 +154,7 @@ type
     //BlackMoon FTP Server, and Serv-U
     //On the server side, you deal with it as a number right from the Win32 FindFirst,
     //FindNext functions.  Easy
-    property WinAttribs : Cardinal read FWinAttribs write FWinAttribs;
+    property WinAttribs : UInt32 read FWinAttribs write FWinAttribs;
 
     property WinDriveType : Integer read FWinDriveType write FWinDriveType;
     property WinDriveLabel : String read FWinDriveLabel write FWinDriveLabel;
@@ -289,7 +290,7 @@ uses
   {$IFDEF USE_VCL_POSIX}
   Posix.SysTime,
   {$ENDIF}
-  IdContainers, IdGlobal, IdFTPCommon, IdGlobalProtocols, IdStrings, SysUtils;
+  IdContainers, IdFTPCommon, IdGlobalProtocols, IdStrings, SysUtils;
 
 type
   {$IFDEF HAS_GENERICS_TObjectList}

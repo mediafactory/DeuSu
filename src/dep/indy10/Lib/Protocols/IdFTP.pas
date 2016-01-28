@@ -879,7 +879,7 @@ type
     procedure SendEPort(AHandle: TIdSocketHandle); overload;
     procedure SendEPort(const AIP : String; const APort : TIdPort; const AIPVersion : TIdIPVersion); overload;
     procedure SendEPassive(var VIP: string; var VPort: TIdPort);
-    function SendHost: Smallint;
+    function SendHost: Int16;
     procedure SetProxySettings(const Value: TIdFtpProxySettings);
     procedure SetClientInfo(const AValue: TIdFTPClientIdentifier);
     procedure SetCompressor(AValue: TIdZLibCompressorBase);
@@ -914,7 +914,7 @@ type
     function GetSupportsVerification : Boolean;
   public
     procedure GetInternalResponse(AEncoding: IIdTextEncoding = nil); override;
-    function CheckResponse(const AResponse: SmallInt; const AAllowedResponses: array of SmallInt): SmallInt; override;
+    function CheckResponse(const AResponse: Int16; const AAllowedResponses: array of Int16): Int16; override;
 
     function IsExtSupported(const ACmd : String):Boolean;
     procedure ExtractFeatFacts(const ACmd : String; AResults : TStrings);
@@ -963,7 +963,7 @@ type
     procedure SiteToSiteDownload(const AFromSite: TIdFTP; const ASourceFile : String; const ADestFile : String = '');
     procedure DisconnectNotifyPeer; override;
     procedure Quit; {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPECATED_MSG} 'Use Disconnect() instead'{$ENDIF};{$ENDIF}
-    function  Quote(const ACommand: String): SmallInt;
+    function  Quote(const ACommand: String): Int16;
     procedure RemoveDir(const ADirName: string);
     procedure Rename(const ASourceFile, ADestFile: string);
     function  ResumeSupported: Boolean;
@@ -973,7 +973,7 @@ type
     procedure Status(AStatusList: TStrings);
     procedure StructureMount(APath: String);
     procedure TransferMode(ATransferMode: TIdFTPTransferMode);
-    procedure ReInitialize(ADelay: Cardinal = 10);
+    procedure ReInitialize(ADelay: UInt32 = 10);
     procedure SetLang(const ALangTag : String);
     function CRC(const AFIleName : String; const AStartPoint : Int64 = 0; const AEndPoint : Int64=0) : Int64;
     //verify file was uploaded, this is more comprehensive than the above
@@ -1027,6 +1027,7 @@ type
     property PassiveUseControlHost: Boolean read FPassiveUseControlHost write FPassiveUseControlHost default DEF_Id_FTP_PassiveUseControlHost;
     property DataPortProtection : TIdFTPDataPortSecurity read FDataPortProtection write SetDataPortProtection default Id_TIdFTP_DataPortProtection;
     property AUTHCmd : TAuthCmd read FAUTHCmd write SetAUTHCmd default DEF_Id_FTP_AUTH_CMD;
+    property ConnectTimeout;
     property DataPort: TIdPort read FDataPort write FDataPort default 0;
     property DataPortMin: TIdPort read FDataPortMin write FDataPortMin default 0;
     property DataPortMax: TIdPort read FDataPortMax write FDataPortMax default 0;
@@ -1054,6 +1055,8 @@ type
     property OnBannerAfterLogin : TIdFTPBannerEvent read FOnBannerAfterLogin write FOnBannerAfterLogin;
     property OnBannerWarning : TIdFTPBannerEvent read FOnBannerWarning write FOnBannerWarning;
 
+    property OnBeforeGet: TNotifyEvent read FOnBeforeGet write FOnBeforeGet;
+    property OnBeforePut: TIdFtpAfterGet read FOnBeforePut write FOnBeforePut;
     property OnAfterClientLogin: TOnAfterClientLogin read FOnAfterClientLogin write FOnAfterClientLogin;
     property OnCreateFTPList: TIdCreateFTPList read FOnCreateFTPList write FOnCreateFTPList;
     property OnAfterGet: TIdFtpAfterGet read FOnAfterGet write FOnAfterGet; //APR
@@ -1430,7 +1433,7 @@ begin
   end;
 end;
 
-function TIdFTP.SendHost: Smallint;
+function TIdFTP.SendHost: Int16;
 var
   LHost: String;
 begin
@@ -1607,17 +1610,17 @@ begin
 end;
 
 const
-  AbortedReplies : array [0..5] of smallint =
+  AbortedReplies : array [0..5] of Int16 =
                    (226,426, 450,451,425,550);
   //226 was added because one server will return that twice if you aborted
   //during an upload.
-  AcceptableAbortReplies : array [0..8] of smallint =
+  AcceptableAbortReplies : array [0..8] of Int16 =
     (225, 226, 250, 426, 450,451,425,550,552);
   //GlobalScape Secure FTP Server returns a 552 for an aborted file
   
 procedure TIdFTP.FinalizeDataOperation;
 var
-  LResponse : SmallInt;
+  LResponse : Int16;
 begin
   DoOnDataChannelDestroy;
   if FDataChannel <> nil then begin
@@ -1648,7 +1651,7 @@ This is a bug fix for servers will do something like this:
   if FAbortFlag.Value then begin
     LResponse := GetResponse(AcceptableAbortReplies);
 //Experimental -
-    if PosInSmallIntArray(LResponse,AbortedReplies)>-1 then begin
+    if PosInSmallIntArray(LResponse,AbortedReplies) > -1 then begin
       GetResponse([226, 225]);
     end;
 //IMPORTANT!!!  KEEP THIS COMMENT!!!
@@ -2190,20 +2193,18 @@ begin
   end;
   if FDataChannel is TIdTCPClient then
   begin
+    TIdTCPClient(FDataChannel).IPVersion := IPVersion;
     TIdTCPClient(FDataChannel).ReadTimeout := FTransferTimeout;
     //Now SocksInfo are multi-thread safe
     FDataChannel.IOHandler.ConnectTimeout := IOHandler.ConnectTimeout;
-  end;
-  if Assigned(FDataChannel.Socket) then
+  end
+  else if FDataChannel is TIdSimpleServer then
   begin
-    if Assigned(Socket) then
-    begin
-      FDataChannel.Socket.TransparentProxy := Socket.TransparentProxy;
-      FDataChannel.Socket.IPVersion := Socket.IPVersion;
-    end else
-    begin
-      FDataChannel.Socket.IPVersion := IPVersion;
-    end;
+    TIdSimpleServer(FDataChannel).IPVersion := IPVersion;
+  end;
+  if Assigned(FDataChannel.Socket) and Assigned(Socket) then
+  begin
+    FDataChannel.Socket.TransparentProxy := Socket.TransparentProxy;
   end;
   FDataChannel.IOHandler.ReadTimeout := FTransferTimeout;
   FDataChannel.IOHandler.SendBufferSize := IOHandler.SendBufferSize;
@@ -2218,7 +2219,7 @@ procedure TIdFTP.Put(const ASource: TStream; const ADestFile: string;
   const AAppend: Boolean = False; const AStartPos: TIdStreamSize = -1);
 begin
   if ADestFile = '' then begin
-    EIdFTPUploadFileNameCanNotBeEmpty.Toss(RSFTPFileNameCanNotBeEmpty);
+    raise EIdFTPUploadFileNameCanNotBeEmpty.Create(RSFTPFileNameCanNotBeEmpty);
   end;
   if AStartPos > -1 then begin
     ASource.Position := AStartPos;
@@ -2440,7 +2441,7 @@ begin
 end;
 
 //Added by SP
-procedure TIdFTP.ReInitialize(ADelay: Cardinal = 10);
+procedure TIdFTP.ReInitialize(ADelay: UInt32 = 10);
 begin
   IndySleep(ADelay); //Added
   if SendCmd('REIN', [120, 220, 500]) <> 500 then begin  {do not localize}
@@ -2555,7 +2556,7 @@ begin
   inherited Destroy;
 end;
 
-function TIdFTP.Quote(const ACommand: String): SmallInt;
+function TIdFTP.Quote(const ACommand: String): Int16;
 begin
   Result := SendCmd(ACommand);
 end;
@@ -2694,6 +2695,7 @@ begin
       end;
     end;
   end;
+  // TODO: should this be moved inside the 'if UseTLS in ExplicitTLSVals' block?
   if not FUsingSFTP then begin
     ProcessTLSNotAvail;
   end;
@@ -3010,10 +3012,10 @@ end;
 procedure TIdFTP.SetUseExtensionDataPort(const AValue: Boolean);
 begin
   if (not AValue) and (IPVersion = Id_IPv6) then begin
-    EIdFTPMustUseExtWithIPv6.Toss(RSFTPMustUseExtWithIPv6);
+    raise EIdFTPMustUseExtWithIPv6.Create(RSFTPMustUseExtWithIPv6);
   end;
   if TryNATFastTrack then begin
-    EIdFTPMustUseExtWithNATFastTrack.Toss(RSFTPMustUseExtWithNATFastTrack);
+    raise EIdFTPMustUseExtWithNATFastTrack.Create(RSFTPMustUseExtWithNATFastTrack);
   end;
   FUseExtensionDataPort := AValue;
 end;
@@ -3091,7 +3093,7 @@ end;
 procedure TIdFTP.SetPassive(const AValue: Boolean);
 begin
   if (not AValue) and TryNATFastTrack then begin
-    EIdFTPPassiveMustBeTrueWithNATFT.Toss(RSFTPFTPPassiveMustBeTrueWithNATFT);
+    raise EIdFTPPassiveMustBeTrueWithNATFT.Create(RSFTPFTPPassiveMustBeTrueWithNATFT);
   end;
   FPassive := AValue;
 end;
@@ -3503,8 +3505,8 @@ begin
   end;
 end;
 
-function TIdFTP.CheckResponse(const AResponse: SmallInt;
-  const AAllowedResponses: array of SmallInt): SmallInt;
+function TIdFTP.CheckResponse(const AResponse: Int16;
+  const AAllowedResponses: array of Int16): Int16;
 var
   i: Integer;
 begin
@@ -3646,22 +3648,22 @@ The following is required:
 begin
   if ATargetUsesPasv then begin
     if AToSite.UsingNATFastTrack then begin
-      EIdFTPSToSNATFastTrack.Toss(RSFTPNoSToSWithNATFastTrack);
+      raise EIdFTPSToSNATFastTrack.Create(RSFTPNoSToSWithNATFastTrack);
     end;
   end else begin
     if AFromSite.UsingNATFastTrack then begin
-      EIdFTPSToSNATFastTrack.Toss(RSFTPNoSToSWithNATFastTrack);
+      raise EIdFTPSToSNATFastTrack.Create(RSFTPNoSToSWithNATFastTrack);
     end;
   end;
 
   if AFromSite.IPVersion <> AToSite.IPVersion then begin
-    EIdFTPStoSIPProtoMustBeSame.Toss(RSFTPSToSProtosMustBeSame);
+    raise EIdFTPStoSIPProtoMustBeSame.Create(RSFTPSToSProtosMustBeSame);
   end;
   if AFromSite.CurrentTransferMode <> AToSite.CurrentTransferMode then begin
-    EIdFTPSToSTransModesMustBeSame.Toss(RSFTPSToSTransferModesMusbtSame);
+    raise EIdFTPSToSTransModesMustBeSame.Create(RSFTPSToSTransferModesMusbtSame);
   end;
   if AFromSite.FUsingSFTP <> AToSite.FUsingSFTP then begin
-    EIdFTPSToSNoDataProtection.Toss(RSFTPSToSNoDataProtection);
+    raise EIdFTPSToSNoDataProtection.Create(RSFTPSToSNoDataProtection);
   end;
 
   Result := AFromSite.FUsingSFTP and AToSite.FUsingSFTP;
@@ -3672,11 +3674,11 @@ begin
       if AToSite.IPVersion = Id_IPv4 then begin
         if ATargetUsesPasv then begin
           if not AToSite.IsExtSupported('CPSV') then begin {do not localize}
-            EIdFTPSToSNATFastTrack.Toss(RSFTPSToSSSCNNotSupported);
+            raise EIdFTPSToSNATFastTrack.Create(RSFTPSToSSSCNNotSupported);
           end;
         end else begin
           if not AFromSite.IsExtSupported('CPSV') then begin {do not localize}
-            EIdFTPSToSNATFastTrack.Toss(RSFTPSToSSSCNNotSupported);
+            raise EIdFTPSToSNATFastTrack.Create(RSFTPSToSSSCNNotSupported);
           end;
         end;
       end;
@@ -4078,10 +4080,10 @@ begin
   end;
   if FDataPortProtection <> AValue then begin
     if FUseTLS = utNoTLSSupport then begin
-      EIdFTPNoDataPortProtectionWOEncryption.Toss(RSFTPNoDataPortProtectionWOEncryption);
+      raise EIdFTPNoDataPortProtectionWOEncryption.Create(RSFTPNoDataPortProtectionWOEncryption);
     end;
     if FUsingCCC then begin
-      EIdFTPNoDataPortProtectionAfterCCC.Toss(RSFTPNoDataPortProtectionAfterCCC);
+      raise EIdFTPNoDataPortProtectionAfterCCC.Create(RSFTPNoDataPortProtectionAfterCCC);
     end;
     FDataPortProtection := AValue;
   end;
@@ -4095,10 +4097,10 @@ begin
   end;
   if FAUTHCmd <> AValue then begin
     if FUseTLS = utNoTLSSupport then begin
-      EIdFTPNoAUTHWOSSL.Toss(RSFTPNoAUTHWOSSL);
+      raise EIdFTPNoAUTHWOSSL.Create(RSFTPNoAUTHWOSSL);
     end;
     if FUsingSFTP then begin
-      EIdFTPCanNotSetAUTHCon.Toss(RSFTPNoAUTHCon);
+      raise EIdFTPCanNotSetAUTHCon.Create(RSFTPNoAUTHCon);
     end;
     FAUTHCmd := AValue;
   end;
@@ -4128,7 +4130,7 @@ end;
 procedure TIdFTP.SetUseCCC(const AValue: Boolean);
 begin
   if (not IsLoading) and (FUseTLS = utNoTLSSupport) then begin
-    EIdFTPNoCCCWOEncryption.Toss(RSFTPNoCCCWOEncryption);
+    raise EIdFTPNoCCCWOEncryption.Create(RSFTPNoCCCWOEncryption);
   end;
   FUseCCC := AValue;
 end;

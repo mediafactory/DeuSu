@@ -203,7 +203,7 @@ uses
   ;
 
 const
-  Levels: array [TCompressionLevel] of ShortInt =
+  Levels: array [TCompressionLevel] of Int8 =
     (Z_NO_COMPRESSION, Z_BEST_SPEED, Z_DEFAULT_COMPRESSION, Z_BEST_COMPRESSION);
 
 function CCheck(code: Integer): Integer;
@@ -284,10 +284,10 @@ begin
     {$IFDEF STREAM_SIZE_64}
     Available := TIdC_UINT(IndyMin(AStream.Size - AStream.Position, High(TIdC_UINT)));
     // TODO: account for a 64-bit position in a 32-bit environment
-    Inc(PtrInt(Result), AStream.Position);
+    Inc(PtrUInt(Result), AStream.Position);
     {$ELSE}
     Available := AStream.Size - AStream.Position;
-    Inc(PtrInt(Result), AStream.Position);
+    Inc(PtrUInt(Result), AStream.Position);
     {$ENDIF}
   end else begin
     Available := 0;
@@ -1123,7 +1123,7 @@ begin
 end;
 
 function TDecompressionStream.IdRead(var VBuffer: TIdBytes; AOffset,
-  ACount: Integer): Longint;
+  ACount: Longint): Longint;
 begin
   FZRec.next_out := PIdAnsiChar(@VBuffer[AOffset]);
   FZRec.avail_out := ACount;

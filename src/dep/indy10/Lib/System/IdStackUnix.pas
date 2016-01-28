@@ -162,17 +162,17 @@ type
     procedure GetSocketName(ASocket: TIdStackSocketHandle; var VIP: string;
      var VPort: TIdPort; var VIPVersion: TIdIPVersion); override;
     procedure Listen(ASocket: TIdStackSocketHandle; ABackLog: Integer); override;
-    function HostToNetwork(AValue: Word): Word; override;
-    function NetworkToHost(AValue: Word): Word; override;
-    function HostToNetwork(AValue: LongWord): LongWord; override;
-    function NetworkToHost(AValue: LongWord): LongWord; override;
-    function HostToNetwork(AValue: Int64): Int64; override;
-    function NetworkToHost(AValue: Int64): Int64; override;
+    function HostToNetwork(AValue: UInt16): UInt16; override;
+    function NetworkToHost(AValue: UInt16): UInt16; override;
+    function HostToNetwork(AValue: UInt32): UInt32; override;
+    function NetworkToHost(AValue: UInt32): UInt32; override;
+    function HostToNetwork(AValue: TIdUInt64): TIdUInt64; override;
+    function NetworkToHost(AValue: TIdUInt64): TIdUInt64; override;
     function RecvFrom(const ASocket: TIdStackSocketHandle; var VBuffer;
       const ALength, AFlags: Integer; var VIP: string; var VPort: TIdPort;
       var VIPVersion: TIdIPVersion): Integer; override;
     function ReceiveMsg(ASocket: TIdStackSocketHandle;
-      var VBuffer: TIdBytes; APkt: TIdPacketInfo): LongWord; override;
+      var VBuffer: TIdBytes; APkt: TIdPacketInfo): UInt32; override;
     procedure WSSendTo(ASocket: TIdStackSocketHandle; const ABuffer;
       const ABufferLength, AFlags: Integer; const AIP: string; const APort: TIdPort;
       AIPVersion: TIdIPVersion = ID_DEFAULT_IP_VERSION); override;
@@ -201,16 +201,16 @@ type
     procedure WriteChecksum(s : TIdStackSocketHandle; var VBuffer : TIdBytes;
       const AOffset : Integer; const AIP : String; const APort : TIdPort;
       const AIPVersion: TIdIPVersion = ID_DEFAULT_IP_VERSION); override;
-    function IOControl(const s: TIdStackSocketHandle; const cmd: LongWord;
-      var arg: LongWord): Integer; override;
+    function IOControl(const s: TIdStackSocketHandle; const cmd: UInt32;
+      var arg: UInt32): Integer; override;
 
     procedure GetLocalAddressList(AAddresses: TIdStackLocalAddressList); override;
   end;
 
   {$IFNDEF NO_REDECLARE}
   TLinger = record
-    l_onoff: Word;
-    l_linger: Word;
+    l_onoff: UInt16;
+    l_linger: UInt16;
   end;
   {$ENDIF}
   TIdLinger = TLinger;
@@ -293,7 +293,7 @@ end;
 function TIdStackUnix.Accept(ASocket: TIdStackSocketHandle;
   var VIP: string; var VPort: TIdPort; var VIPVersion: TIdIPVersion): TIdStackSocketHandle;
 var
-  LA : LongInt;
+  LA : socklen_t;
   LAddr: sockaddr_in6;
 begin
   LA := SizeOf(LAddr);
@@ -494,7 +494,7 @@ begin
 end;
 
 function TIdStackUnix.ReceiveMsg(ASocket: TIdStackSocketHandle;
-  var VBuffer: TIdBytes; APkt: TIdPacketInfo): LongWord;
+  var VBuffer: TIdBytes; APkt: TIdPacketInfo): UInt32;
 var
   LIP : String;
   LPort : TIdPort;
@@ -513,7 +513,7 @@ end;
 {var
   LIP : String;
   LPort : TIdPort;
-  LSize: Cardinal;
+  LSize: UInt32;
   LAddr: SockAddr_In6;
   LMsg : msghdr;
   LMsgBuf : BUF;
@@ -522,7 +522,7 @@ end;
   LCurPt : Pin_pktinfo;
   LCurPt6 : Pin6_pktinfo;
   LByte : PByte;
-  LDummy, LDummy2 : Cardinal;
+  LDummy, LDummy2 : UInt32;
 begin
   //we call the macro twice because we specified two possible structures.
   //Id_IPV6_HOPLIMIT and Id_IPV6_PKTINFO
@@ -705,17 +705,17 @@ begin
   end;
 end;
 
-function TIdStackUnix.HostToNetwork(AValue: Word): Word;
+function TIdStackUnix.HostToNetwork(AValue: UInt16): UInt16;
 begin
   Result := htons(AValue);
 end;
 
-function TIdStackUnix.NetworkToHost(AValue: Word): Word;
+function TIdStackUnix.NetworkToHost(AValue: UInt16): UInt16;
 begin
   Result := ntohs(AValue);
 end;
 
-function TIdStackUnix.HostToNetwork(AValue: LongWord): LongWord;
+function TIdStackUnix.HostToNetwork(AValue: UInt32): UInt32;
 begin
   {$IFOPT R+} // detect range checking
     {$DEFINE _RPlusWasEnabled}
@@ -729,7 +729,7 @@ begin
   {$ENDIF}
 end;
 
-function TIdStackUnix.NetworkToHost(AValue: LongWord): LongWord;
+function TIdStackUnix.NetworkToHost(AValue: UInt32): UInt32;
 begin
   {$IFOPT R+} // detect range checking
     {$DEFINE _RPlusWasEnabled}
@@ -745,41 +745,114 @@ end;
 
 { RP - I'm not sure what endian Linux natively uses, thus the
 check to see if the bytes need swapping or not ... }
-function TIdStackUnix.HostToNetwork(AValue: Int64): Int64;
+function TIdStackUnix.HostToNetwork(AValue: TIdUInt64): TIdUInt64;
 var
-  LParts: TIdInt64Parts;
-  L: LongWord;
+  LParts: TIdUInt64Parts;
+  L: UInt32;
 begin
-  LParts.QuadPart := AValue;
+  LParts.QuadPart := AValue{$IFDEF TIdUInt64_IS_NOT_NATIVE}.QuadPart{$ENDIF};
   L := htonl(LParts.HighPart);
   if (L <> LParts.HighPart) then begin
     LParts.HighPart := htonl(LParts.LowPart);
     LParts.LowPart := L;
   end;
-  Result := LParts.QuadPart;
+  Result{$IFDEF TIdUInt64_IS_NOT_NATIVE}.QuadPart{$ENDIF} := LParts.QuadPart;
 end;
 
-function TIdStackUnix.NetworkToHost(AValue: Int64): Int64;
+function TIdStackUnix.NetworkToHost(AValue: TIdUInt64): TIdUInt64;
 var
-  LParts: TIdInt64Parts;
-  L: LongWord;
+  LParts: TIdUInt64Parts;
+  L: UInt32;
 begin
-  LParts.QuadPart := AValue;
+  LParts.QuadPart := AValue{$IFDEF TIdUInt64_IS_NOT_NATIVE}.QuadPart{$ENDIF};
   L := ntohl(LParts.HighPart);
   if (L <> LParts.HighPart) then begin
     LParts.HighPart := ntohl(LParts.LowPart);
     LParts.LowPart := L;
   end;
-  Result := LParts.QuadPart;
+  Result{$IFDEF TIdUInt64_IS_NOT_NATIVE}.QuadPart{$ENDIF} := LParts.QuadPart;
 end;
+
+{$IFDEF HAS_getifaddrs}
+// TODO: does FreePascal already define these anywhere?
+
+type
+  pifaddrs = ^ifaddrs;
+  ifaddrs = record
+    ifa_next: pifaddrs;       { Pointer to next struct }
+    ifa_name: PIdAnsiChar;    { Interface name }
+    ifa_flags: Cardinal;      { Interface flags }
+    ifa_addr: psockaddr;      { Interface address }
+    ifa_netmask: psockaddr;   { Interface netmask }
+    ifa_broadaddr: psockaddr; { Interface broadcast address }
+    ifa_dstaddr: psockaddr;   { P2P interface destination }
+    ifa_data: Pointer;        { Address specific data }
+  end;
+
+const
+  IFF_LOOPBACK = $8;
+  
+function getifaddrs(var ifap: pifaddrs): Integer; cdecl; external 'libc.so' name 'getifaddrs'; {do not localize}
+procedure freeifaddrs(ifap: pifaddrs); cdecl; external 'libc.so' name 'freeifaddrs'; {do not localize}
+
+{$ENDIF}
 
 procedure TIdStackUnix.GetLocalAddressList(AAddresses: TIdStackLocalAddressList);
 var
+  {$IFDEF HAS_getifaddrs}
+  LAddrList, LAddrInfo: pifaddrs;
+  LSubNetStr: String;
+  {$ELSE}
   LI4 : array of THostAddr;
   LI6 : array of THostAddr6;
   i : Integer;
   LHostName : String;
+  {$ENDIF}
 begin
+  // TODO: Using gethostname() and ResolveName() like this may not always
+  // return just the machine's IP addresses. Technically speaking, they will
+  // return the local hostname, and then return the address(es) to which that
+  // hostname resolves. It is possible for a machine to (a) be configured such
+  // that its name does not resolve to an IP, or (b) be configured such that
+  // its name resolves to multiple IPs, only one of which belongs to the local
+  // machine. For better results, we should use getifaddrs() on platforms that
+  // support it...
+
+  {$IFDEF HAS_getifaddrs}
+
+  if getifaddrs(LAddrList) = 0 then // TODO: raise an exception if it fails
+  try
+    AAddresses.BeginUpdate;
+    try
+      LAddrInfo := LAddrList;
+      repeat
+        if (LAddrInfo^.ifa_addr <> nil) and ((LAddrInfo^.ifa_flags and IFF_LOOPBACK) = 0) then
+        begin
+          case LAddrInfo^.ifa_addr^.sa_family of
+            Id_PF_INET4: begin
+              if LAddrInfo^.ifa_netmask <> nil then begin
+                LSubNetStr := TranslateTInAddrToString( PSockAddr_In(LAddrInfo^.ifa_netmask)^.sin_addr, Id_IPv4);
+              end else begin
+                LSubNetStr := '';
+              end;
+              TIdStackLocalAddressIPv4.Create(AAddresses, TranslateTInAddrToString( PSockAddr_In(LAddrInfo^.ifa_addr)^.sin_addr, Id_IPv4), LSubNetStr);
+            end;
+            Id_PF_INET6: begin
+              TIdStackLocalAddressIPv6.Create(AAddresses, TranslateTInAddrToString( PSockAddr_In6(LAddrInfo^.ifa_addr)^.sin6_addr, Id_IPv6));
+            end;
+          end;
+        end;
+        LAddrInfo := LAddrInfo^.ifa_next;
+      until LAddrInfo = nil;
+    finally
+      AAddresses.EndUpdate;
+    end;
+  finally
+    freeifaddrs(LAddrList);
+  end;
+
+  {$ELSE}
+
   LHostName := GetHostName;
   if LHostName = '' then begin
     RaiseLastSocketError;
@@ -803,6 +876,8 @@ begin
   finally
     AAddresses.EndUpdate;
   end;
+
+  {$ENDIF}
 end;
 
 function TIdStackUnix.HostByAddress(const AAddress: string;
@@ -928,6 +1003,11 @@ end;
 procedure TIdStackUnix.SetBlocking(ASocket: TIdStackSocketHandle;
   const ABlocking: Boolean);
 begin
+  // TODO: enable this
+  {
+  LValue := UInt32(not ABlocking);
+  CheckForSocketError(fpioctl(ASocket, FIONBIO, @LValue));
+  }
   if not ABlocking then begin
     raise EIdNonBlockingNotSupported.Create(RSStackNonBlockingNotSupported);
   end;
@@ -937,6 +1017,9 @@ function TIdStackUnix.WouldBlock(const AResult: Integer): Boolean;
 begin
   //non-blocking does not exist in Linux, always indicate things will block
   Result := True;
+
+  // TODO: enable this:
+  //Result := CheckForSocketError(AResult, [EAGAIN, EWOULDBLOCK]) <> 0;
 end;
 
 function TIdStackUnix.SupportsIPv6: Boolean;
@@ -949,6 +1032,8 @@ function TIdStackUnix.CheckIPVersionSupport(const AIPVersion: TIdIPVersion): Boo
 var
   LTmpSocket: TIdStackSocketHandle;
 begin
+  // TODO: on nix systems (or maybe just Linux?), an alternative would be to
+  // check for the existance of the '/proc/net/if_inet6' kernel pseudo-file
   LTmpSocket := WSSocket(IdIPFamily[AIPVersion], Integer(Id_SOCK_STREAM), Id_IPPROTO_IP);
   Result := LTmpSocket <> Id_INVALID_SOCKET;
   if Result then begin
@@ -961,7 +1046,7 @@ procedure TIdStackUnix.WriteChecksum(s: TIdStackSocketHandle;
   const APort: TIdPort; const AIPVersion: TIdIPVersion);
 begin
   case AIPVersion of
-    Id_IPv4 : CopyTIdWord(HostToLittleEndian(CalcCheckSum(VBuffer)), VBuffer, AOffset);
+    Id_IPv4 : CopyTIdUInt16(HostToLittleEndian(CalcCheckSum(VBuffer)), VBuffer, AOffset);
     Id_IPv6 : WriteChecksumIPv6(s, VBuffer, AOffset, AIP, APort);
   else
     IPVersionUnsupported;
@@ -979,8 +1064,8 @@ begin
   SetSocketOption(s, Id_IPPROTO_IPV6, IPV6_CHECKSUM, AOffset);
 end;
 
-function TIdStackUnix.IOControl(const s: TIdStackSocketHandle; const cmd: LongWord;
-  var arg: LongWord): Integer;
+function TIdStackUnix.IOControl(const s: TIdStackSocketHandle; const cmd: UInt32;
+  var arg: UInt32): Integer;
 begin
   Result := fpioctl(s, cmd, @arg);
 end;
@@ -1012,7 +1097,7 @@ But the more serious reason is another one, which exists in Windows too:
 
 JM Berg, 2002-09-09
 
-function ServeFile(ASocket: TIdStackSocketHandle; AFileName: string): cardinal;
+function ServeFile(ASocket: TIdStackSocketHandle; AFileName: string): UInt32;
 var
   LFileHandle: integer;
   offset: integer;
@@ -1023,7 +1108,7 @@ begin
     offset := 0;
     fstat(LFileHandle, stat);
     Result := sendfile(ASocket, LFileHandle, offset, stat.st_size);
-//**    if Result = Cardinal(-1) then RaiseLastOSError;
+//**    if Result = UInt32(-1) then RaiseLastOSError;
   finally libc.__close(LFileHandle); end;
 end;
 *)

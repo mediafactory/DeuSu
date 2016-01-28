@@ -545,14 +545,18 @@ begin
 end;
 
 function TIdCustomTCPServer.DoExecute(AContext: TIdContext): Boolean;
+var
+  // under ARC, convert a weak reference to a strong reference before working with it
+  LConn: TIdTCPConnection;
 begin
   if Assigned(OnExecute) then begin
     OnExecute(AContext);
   end;
   Result := False;
   if AContext <> nil then begin
-    if AContext.Connection <> nil then begin
-      Result := AContext.Connection.Connected;
+    LConn := AContext.Connection;
+    if LConn <> nil then begin
+      Result := LConn.Connected;
     end;
   end;
 end;
@@ -607,7 +611,8 @@ begin
   // Loaded will recall it to toggle it
   if IsDesignTime or IsLoading then begin
     FActive := AValue;
-  end else if FActive <> AValue then begin
+  end
+  else if FActive <> AValue then begin
     if AValue then begin
       CheckOkToBeActive;
       try
@@ -671,7 +676,7 @@ begin
     // gets called by Notification() if the Scheduler is freed while
     // the server is still Active?
     if Active then begin
-      EIdException.Toss(RSTCPServerSchedulerAlreadyActive);
+      raise EIdException.Create(RSTCPServerSchedulerAlreadyActive);
     end;
 
     // under ARC, all weak references to a freed object get nil'ed automatically
@@ -720,6 +725,16 @@ begin
   LIOHandler := FIOHandler;
 
   if LIOHandler <> AValue then begin
+
+    // RLebeau - is this needed?  SetScheduler() does it, so should SetIOHandler()
+    // also do it? What should happen if this gets called by Notification() if the
+    // IOHandler is freed while the server is still Active?
+    {
+    if Active then begin
+      raise EIdException.Create(RSTCPServerIOHandlerAlreadyActive);
+    end;
+    }
+
     if FImplicitIOHandler then begin
       FIOHandler := nil;
       FImplicitIOHandler := False;
@@ -955,6 +970,8 @@ end;
     {$UNDEF CanCreateTwoBindings}
   {$ENDIF}
 {$ENDIF}
+// TODO: Would this be solved by enabling the SO_REUSEPORT option on
+// platforms that support it?
 
 procedure TIdCustomTCPServer.Startup;
 var

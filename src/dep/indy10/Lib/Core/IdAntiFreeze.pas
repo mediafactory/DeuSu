@@ -59,8 +59,13 @@ uses
   IdAntiFreezeBase,
   IdBaseComponent;
 
-{ Directive needed for C++Builder HPP and OBJ files for this that will force it
-to be statically compiled into the code }
+{ Directive needed for generating a legacy non-UnitScoped C++Builder HPP }
+
+{$IFDEF HAS_DIRECTIVE_HPPEMIT_LEGACYHPP}
+  {$HPPEMIT LEGACYHPP}
+{$ENDIF}
+
+{ Directive needed for C++Builder HPP to force static linking to this unit }
 
 {$IFDEF HAS_DIRECTIVE_HPPEMIT_LINKUNIT}
   {$HPPEMIT LINKUNIT}
@@ -77,13 +82,18 @@ type
   {$IFDEF HAS_ComponentPlatformsAttribute}
   [ComponentPlatformsAttribute(
     pidWin32
+    {$IFDEF HAS_ComponentPlatformsAttribute_Win32} or pidWin32{$ENDIF}
     {$IFDEF HAS_ComponentPlatformsAttribute_Win64} or pidWin64{$ENDIF}
     {$IFDEF HAS_ComponentPlatformsAttribute_OSX32} or pidOSX32{$ENDIF}
     {$IFDEF HAS_ComponentPlatformsAttribute_iOS_Simulator} or pidiOSSimulator{$ENDIF}
     {$IFDEF HAS_ComponentPlatformsAttribute_Android} or pidAndroid{$ENDIF}
     {$IFDEF HAS_ComponentPlatformsAttribute_Linux32} or pidLinux32{$ENDIF}
-    {$IFDEF HAS_ComponentPlatformsAttribute_iOS_Device} or pidiOSDevice{$ENDIF}
+    {$IFDEF HAS_ComponentPlatformsAttribute_iOS_Device32} or pidiOSDevice32{$ELSE}
+    {$IFDEF HAS_ComponentPlatformsAttribute_iOS_Device} or pidiOSDevice{$ENDIF}{$ENDIF}
     {$IFDEF HAS_ComponentPlatformsAttribute_WinNX32} or pidWinNX32{$ENDIF}
+    {$IFDEF HAS_ComponentPlatformsAttribute_Linux64} or pidLinux64{$ENDIF}
+    {$IFDEF HAS_ComponentPlatformsAttribute_WinIoT32} or pidWinIoT32{$ENDIF}
+    {$IFDEF HAS_ComponentPlatformsAttribute_iOS_Device64} or pidiOSDevice64{$ENDIF}
   )]
   {$ENDIF}
   TIdAntiFreeze = class(TIdAntiFreezeBase)
