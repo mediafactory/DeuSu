@@ -25,11 +25,11 @@ const
   cPathDelimiter = '\';
 {$ENDIF}
 
-  cShortVersion = '5.1.0';
-  cDate = '30-Nov-2015';
+  cShortVersion = '5.1.1';
+  cDate = '29-Jan-2016';
   cVersion = cShortVersion+'   '+cDate;
 
-  cCopyright = '(c) 1999-2015 Michael Schoebel & Acoon GmbH';
+  cCopyright = '(c) 1999-2016 Michael Schoebel & Acoon GmbH';
   cVersionCopy = cVersion+cCRLF+cCopyright;
   cGPLNotice =
     'This program is licensed under GPL version 2 (see LICENSE.TXT)'+
