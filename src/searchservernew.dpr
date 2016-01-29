@@ -45,14 +45,6 @@ uses
 const
     cMaxKeywords = 10; // This defines the maximum number of keywords per query
     cMaxTempPages = 32768; // Size of read-buffer used during query-processing
-
-    cMaxPagesPerShard = 10 * 1000 * 1000;
-    // Number of shards is defined in dbtypes.pas -> cDbCount
-    // 10 million is enough for 1.28 billion pages when used with the default
-    // number of 128 shards. You can set this pretty high without adverse
-    // consequences, as the actual memory-allocation is only the amount that
-    // is really needed.
-
     cMaxCachedResults = 2 * 1024 - 1;
 
 
@@ -67,19 +59,12 @@ type
         Query: shortstring;
     end;
 
-    tRWIWorkChunk = record
-        RWIData: array of uint32;
-        Action: tAction;
-    end;
-
-    pRWIWorkChunk = ^tRWIWorkChunk;
-
     tServerObject = class
-	public
-	    procedure IdHTTPServer1CommandGet(
-		AContext: TIdContext;
-		ARequestInfo: TIdHTTPRequestInfo;
-		AResponseInfo: TIdHTTPResponseInfo);
+        public
+            procedure CommandGet(
+                AContext: TIdContext;
+                ARequestInfo: TIdHTTPRequestInfo;
+                AResponseInfo: TIdHTTPResponseInfo);
     end;
 
     tFeatureFlags = record
@@ -91,7 +76,6 @@ type
 
 
 var
-    ServerObject: tServerObject;
     RankData: array of int32;
     BackLinkData: array of int32;
     MaxBackLinkCount: int64;
@@ -103,14 +87,11 @@ var
     ThisIsCachedResult: boolean;
     Ti4, Ti5, Ti6: int64;
     cSData: string;
-    MainQS: array [0 .. 2048] of AnsiChar;
-    f: TextFile;
     Begriff: AnsiString;
     StartWithNr: integer;
     PreferDe, PreferEn, GerOnly: boolean;
     KeyWordCount: integer;
     KeyWords: array [1 .. cMaxKeywords] of shortstring;
-    KeyWordIsHostName: array [1 .. cMaxKeywords] of boolean;
     KeyWordResultCount: array [1 .. cMaxKeywords] of int32;
     KeyWordAction: array [1 .. cMaxKeywords] of tAction;
     BitField, TempBitField: array of uint32;
@@ -130,7 +111,6 @@ var
     BitFieldInitialized: boolean;
     Counter: integer;
     Count: integer;
-    RefreshCachesCountdown: integer;
     Ticks: int64;
     MinTicks, MaxTicks: integer;
     CritSec: tCriticalSection;
@@ -147,8 +127,7 @@ var
 
 
 
-
-procedure ResizeValueArray(Value, MinSize: int32);
+procedure ResizeValueArray(Value: int32);
 var
     CurrentSize: int32;
     NewSize: int32;
@@ -165,7 +144,7 @@ procedure SetValueData(Value, Index, DocId: int32); inline;
 begin
     Dec(Index);
     if Index > High(ValueData[Value]) then
-        ResizeValueArray(Value, Index+1);
+        ResizeValueArray(Value);
 
     ValueData[Value][Index] := DocId;
 end;
@@ -176,7 +155,7 @@ function GetValueData(Value, Index: int32):int32; inline;
 begin
     Dec(Index);
     if Index > High(ValueData[Value]) then
-        ResizeValueArray(Value, Index+1);
+        ResizeValueArray(Value);
 
     Result := ValueData[Value][Index];
 end;
@@ -201,7 +180,10 @@ var
     ln_mbl: double;
 begin
     SetLength(BackLinkValueArray, MaxBackLinkCount+1);
+
+    ln_mbl := ln(1);
     if MaxBackLinkCount>0 then ln_mbl := ln(MaxBackLinkCount);
+
     for i := 0 to High(BackLinkValueArray) do
     begin
         if i = 0 then BackLinkValueArray[i] := 1.0
@@ -261,115 +243,6 @@ end;
 
 
 
-function FindParam(const Name: AnsiString): string;
-const
-    MaxLen = 255;
-var
-    ThisName: AnsiString;
-    i, j: integer;
-    Code1, Code3: integer;
-    qs: array [0 .. 2048] of AnsiChar;
-    Data, Data2: AnsiString;
-begin
-    StrCopy(qs, MainQS);
-    StrLower(qs);
-
-    i := 0;
-    Data := '';
-    while qs[i] <> #0 do
-    begin
-        ThisName := '';
-        if qs[i] = '&' then Inc(i);
-        while ((qs[i] <> #0) and (qs[i] <> '=')) do
-        begin
-            ThisName := ThisName + qs[i];
-            Inc(i);
-        end;
-
-        if Name = ThisName then
-        begin
-            j := 0;
-            if (qs[i] = '=') then Inc(i);
-            while ((qs[i] <> #0) and (qs[i] <> '&') and (j < MaxLen)) do
-            begin
-                Data := Data + qs[i];
-                Inc(i);
-                Inc(j);
-            end;
-
-
-            Data2 := '';
-            while Data <> '' do
-            begin
-                case Data[1] of
-                    'ä', 'Ä':
-                        begin
-                            Data2 := Data2 + 'ae';
-                            Delete(Data, 1, 1);
-                        end;
-                    'ö', 'Ö':
-                        begin
-                            Data2 := Data2 + 'oe';
-                            Delete(Data, 1, 1);
-                        end;
-                    'ü', 'Ü':
-                        begin
-                            Data2 := Data2 + 'ue';
-                            Delete(Data, 1, 1);
-                        end;
-                    'ß':
-                        begin
-                            Data2 := Data2 + 'ss';
-                            Delete(Data, 1, 1);
-                        end;
-                    '%': if Length(Data) >= 3 then
-                        begin
-                            Code1 := StrToIntDef('$' + copy(Data, 2, 2), 0);
-                            Delete(Data, 1, 3);
-                            case Code1 of
-                                $C3:
-                                    begin
-                                        Code3 := StrToIntDef('$' + copy(Data, 2, 2), 0);
-                                        Delete(Data, 1, 2);
-                                        case Code3 of
-                                            $A4, $84: Data2 := Data2 + 'ae';
-                                            $B6, $96: Data2 := Data2 + 'oe';
-                                            $AC, $9C: Data2 := Data2 + 'ue';
-                                            $9F: Data2 := Data2 + 'ss';
-                                        else Data2 := Data2 + Chr(Code1) + Chr(Code3);
-                                        end;
-                                    end;
-                                $C4, $E4: Data2 := Data2 + 'ae';
-                                $D6, $F6: Data2 := Data2 + 'oe';
-                                $DC, $FC: Data2 := Data2 + 'ue';
-                                $DF: Data2 := Data2 + 'ss';
-                            else Data2 := Data2 + Chr(Code1);
-                            end;
-                        end
-                        else
-                        begin
-                            Data2 := Data2 + Data[1];
-                            Delete(Data, 1, 1);
-                        end;
-                else
-                    begin
-                        Data2 := Data2 + Data[1];
-                        Delete(Data, 1, 1);
-                    end;
-                end;
-            end;
-
-            Result := Data2;
-            exit;
-        end;
-
-        while ((qs[i] <> #0) and (qs[i] <> '&')) do
-            Inc(i);
-    end;
-end;
-
-
-
 procedure ExtractKeywords;
 var
     i: integer;
@@ -407,8 +280,9 @@ end;
 
 
 
-procedure ReadString(var Fi: tFileStream; var s: shortstring);
+procedure ReadString(var Fi: tFileStream; out s: shortstring);
 begin
+    s := ''; // Stop the compiler complaining about it not being initialized
     Fi.Read(s, 1);
     if Length(s) > 0 then
         Fi.Read(s[1], Length(s));
@@ -425,12 +299,22 @@ var
     Po, An: int32;
     ThisAn, fd: integer;
 begin
+    // These need to be initialized to stop the compiler complaining about
+    // them. These variables are used as VAR parameters that don't carry
+    // data *to* any procedure/function. They only carry data *out* of them.
+    Po := 0;
+    An := 0;
+
     case Action of
         acSet:
             begin
-                BitFieldInitialized := true;
+                BitFieldInitialized := false;
                 FillChar(BitField[0], Length(BitField)*4, 0);
                 FillChar(ValueTable, SizeOf(ValueTable), 0);
+                if KeyWordCount > 1 then
+                begin
+                    BitFieldInitialized := true;
+                end;
             end;
         acAnd:
             begin
@@ -465,40 +349,57 @@ begin
                 for i := 1 to ThisAn do
                 begin
                     Data := TempBuf[i];
-                    fd := FilterData[Data shr 3];
+                    fd := FilterData[Data];
                     ThisValue := b1;
                     Inc(ThisValue, (31 - (fd and 31)) * b7);
                     if Action = acSet then
-                        Inc(ThisValue, Round(GetBackLinkValue(Data shr 3)));
+                        Inc(ThisValue, Round(GetBackLinkValue(Data)));
                     if ThisValue < 1 then ThisValue := 1;
                     if ThisValue > 65535 then ThisValue := 65535;
+                    if ThisValue > MaxValue then MaxValue := ThisValue;
 
                     case Action of
                         acSet:
                             begin
-                                Inc(ValueTable[ThisValue]);
-                                Values[Data shr 3] := ThisValue;
-                                Inc(BitField[Data shr 8], 1 shl ((Data shr 3) and 31));
+                                if KeyWordCount > 1 then
+                                begin
+                                    Values[Data] := ThisValue;
+                                    Inc(BitField[Data shr 5], (1 shl ((Data) and 31)));
+                                end
+                                else
+                                begin
+                                    Inc(Count);
+                                    if ThisValue > MaxValue then MaxValue := ThisValue;
+                                    Inc(ValueTable[ThisValue]);
+                                    if ValueTable[ThisValue] <= 1024 then
+                                    begin
+                                        SetValueData(ThisValue, ValueTable[ThisValue], Data);
+                                    end;
+                                    //Inc(BitField[Data shr 5], 1 shl ((Data) and 31));
+                                end;
                             end;
                         acAnd:
                             begin
-                                if (BitField[Data shr 8] and (1 shl ((Data shr 3) and 31))) > 0 then
-                                    NewValue := Values[Data shr 3]
+                                if (BitField[Data shr 5] and (1 shl ((Data) and 31))) > 0 then
+                                    NewValue := Values[Data]
                                 else NewValue := 0;
 
                                 Dec(ValueTable[NewValue]);
                                 Inc(NewValue, ThisValue);
 
                                 if NewValue > 65535 then NewValue := 65535;
+                                if NewValue > MaxValue then MaxValue := NewValue;
 
 
-                                Inc(ValueTable[NewValue]);
-                                Values[Data shr 3] := NewValue;
-                                Inc(TempBitField[Data shr 8], 1 shl ((Data shr 3) and 31));
+                                //Inc(ValueTable[NewValue]);
+                                Values[Data] := NewValue;
+                                Inc(TempBitField[Data shr 5], 1 shl ((Data) and 31));
                             end;
                         acNot:
                             begin
-                                Dec(TempBitField[Data shr 8], 1 shl ((Data shr 3) and 31));
+                                BitField[Data shr 5] := BitField[Data shr 5] and
+                                    (not (1 shl ((Data) and 31)));
+                                //Dec(TempBitField[Data shr 5], 1 shl ((Data) and 31));
                             end;
                     end; { case Action of }
                 end; { For-Schleife }
@@ -605,6 +506,7 @@ end;
 
 function FindKeyWordResultCountForHost(ThisKey: shortstring): integer;
 begin
+    // TODO: Not implemented yet
     Result := 0;
 end;
 
@@ -622,6 +524,15 @@ var
     THP32: int32;
 begin
     Result := 0;
+
+    // These need to be initialized to stop the compiler complaining about
+    // them. These variables are used as VAR parameters that don't carry
+    // data *to* any procedure/function. They only carry data *out* of them.
+    Po := 0;
+    Po32 := 0;
+    TopHitsPointer := 0;
+    THP32 := 0;
+    An := 0;
 
     if (LowerCase(copy(ThisKey, 1, 5)) = 'host:') or
     (LowerCase(copy(ThisKey, 1, 5)) = 'site:') then
@@ -722,7 +633,6 @@ begin
         if LowerCase(copy(ThisKey, Length(ThisKey) - 2, 3)) = 'com' then Insert('.', ThisKey, Length(ThisKey) - 2);
         if LowerCase(copy(ThisKey, Length(ThisKey) - 1, 2)) = 'de' then Insert('.', ThisKey, Length(ThisKey) - 1);
         begin
-            KeyWordIsHostName[KeywordNr] := true;
             KeyWords[KeywordNr] := 'host:' + ThisKey;
         end;
     end;
@@ -753,7 +663,16 @@ var
     THP32, PreviousDocumentID: int32;
     ValueFlags: array[0..255] of integer;
 begin
-    Ti4 := GetTickCount;
+    // These need to be initialized to stop the compiler complaining about
+    // them. These variables are used as VAR parameters that don't carry
+    // data *to* any procedure/function. They only carry data *out* of them.
+    THP32 := 0;
+    Po := 0;
+    Po32 := 0;
+    An := 0;
+    TopHitsPointer := 0;
+
+    Ti4 := GetTickCount64;
     Ti5 := 0;
     Ti6 := 0;
 
@@ -832,7 +751,7 @@ begin
             end;
     end;
 
-    Ti5 := GetTickCount - Ti4;
+    Ti5 := GetTickCount64 - Ti4;
     HashCode := CalcCRC(ThisKey);;
     Str(HashCode and 63, s);
     Keys := @KeyDbs[HashCode and 63];
@@ -869,7 +788,7 @@ begin
         begin
             if Action = acAnd then
                 FillChar(BitField[0], Length(BitField) * 4, 0);
-            Ti6 := GetTickCount - Ti5 - Ti4;
+            Ti6 := GetTickCount64 - Ti5 - Ti4;
             exit;
         end;
         Keys.Read(s[1], Length(s));
@@ -1019,7 +938,7 @@ begin
                 Dec(An, ThisAn);
             end; { while An>0 }
 
-            Ti5 := GetTickCount - Ti4;
+            Ti5 := GetTickCount64 - Ti4;
             if Action = acAnd then
             begin
                 TempBit := 0;
@@ -1034,7 +953,7 @@ begin
                 end;
             end;
 
-            Ti6 := GetTickCount - Ti5 - Ti4;
+            Ti6 := GetTickCount64 - Ti5 - Ti4;
             exit;
         end;
 
@@ -1044,7 +963,7 @@ begin
             begin
                 if Action = acAnd then
                     FillChar(BitField[0], Length(BitField) * 4, 0);
-                Ti6 := GetTickCount - Ti5 - Ti4;
+                Ti6 := GetTickCount64 - Ti5 - Ti4;
                 exit;
             end;
             Keys.Seek(Po32);
@@ -1056,7 +975,7 @@ begin
     if Action = acAnd then
         FillChar(BitField[0], Length(BitField) * 4, 0);
 
-    Ti6 := GetTickCount - Ti5 - Ti4;
+    Ti6 := GetTickCount64 - Ti5 - Ti4;
 end;
 
 
@@ -1093,7 +1012,6 @@ var
 begin
     for i := 1 to KeyWordCount do
     begin
-        KeyWordIsHostName[i] := false;
         ThisKey := KeyWords[i];
         Method := logAnd;
         if ThisKey <> '' then
@@ -1150,10 +1068,6 @@ begin
         else ThisQuery := ThisQuery + ' ' + KeyWords[i];
     ThisQuery := ThisQuery + #255 + IntToStr(b1) + #255 + IntToStr(b2) + #255 + IntToStr(b3) +
     #255 + IntToStr(b4) + #255 + IntToStr(b5) + #255 + IntToStr(b6) + #255 + IntToStr(b7);
-
-    if FindParam('preferde') <> '' then ThisQuery := ThisQuery + #255 + 'preferde=on';
-    if FindParam('preferen') <> '' then ThisQuery := ThisQuery + #255 + 'preferen=on';
-    if FindParam('geronly') <> '' then ThisQuery := ThisQuery + #255 + 'geronly=on';
 
     HashCode := CalcCRC(ThisQuery) and cMaxCachedResults;
     {$IFNDEF DISABLE_RESULT_CACHING}
@@ -1228,7 +1142,7 @@ end;
 
 
 
-procedure ShowLink(Nr, Value, LfdNr: integer; Li: tStringList);
+procedure ShowLink(Nr, Value: integer; Li: tStringList);
 var
     Url: shortstring;
     s: shortstring;
@@ -1245,9 +1159,12 @@ begin
     UrlPo := UrlPo * PageInfoSize;
 
     Html[DbNr].Position := UrlPo;
+
+    Url := ''; // Stop the compiler complaining about it not being initialized
     Html[DbNr].Read(Url, 1 + cMaxUrlLength);
     Li.Add('url=http://' + Url);
 
+    s := ''; // Stop the compiler complaining about it not being initialized
     Html[DbNr].Read(s, 1 + cMaxTitleLength);
     if Trim(s) = '' then s := '(Ohne Titel)'; // "Ohne Titel" is German for "Without a title"
     Li.Add('title=' + s);
@@ -1271,7 +1188,6 @@ var
     EndWithNr: integer;
     ThisValue: integer;
     HashCode: integer;
-    f: TextFile;
     s: string;
 begin
     if BitFieldInitialized then
@@ -1422,7 +1338,6 @@ begin
     Li.Add('EndWith=' + IntToStr(EndWithNr));
 
 
-
     for ThisValue := MaxValue downto 0 do
     begin
         for i := 1 to ValueTable[ThisValue] do
@@ -1431,7 +1346,7 @@ begin
             if (Nr >= StartWithNr) and (Nr <= EndWithNr) then
             begin
                 j := GetValueData(ThisValue, i);
-                if (QueryPass = 2) or (ResultCount >= 1000) then ShowLink(j, ThisValue, Nr, Li);
+                if (QueryPass = 2) or (ResultCount >= 1000) then ShowLink(j, ThisValue, Li);
             end; { Show this link }
             if Nr >= EndWithNr then break;
         end;
@@ -1818,7 +1733,7 @@ begin
         CheckDataPath;
 
 
-        Ti := GetTickCount;
+        Ti := GetTickCount64;
 
         b1 := 8 * 256;
         b2 := 2 * 256;
@@ -1883,12 +1798,12 @@ begin
 
         OpenSnippetDatabases;
 
-        Ti2 := GetTickCount;
+        Ti2 := GetTickCount64;
         QueryPass := 1;
         {$IFNDEF DISABLE_FANCY_HITS}
         FindKeys;
         {$ENDIF}
-        Ti3 := GetTickCount;
+        Ti3 := GetTickCount64;
 
         Li := tStringList.Create;
         Li.Sorted := false;
@@ -1907,7 +1822,11 @@ begin
 
         Res.ContentType := 'text/html';
         Res.CharSet := 'utf-8';
+        {$IFDEF WINDOWS}
         Res.ContentText := UTF8Decode(Li.Text);
+        {$ELSE}
+        Res.ContentStream := tStream(tStringStream.Create(Li.Text));
+        {$ENDIF}
 
         Li.Free;
         CloseSnippetDatabases;
@@ -1915,7 +1834,7 @@ begin
         if not ThisIsCachedResult then
         begin
             Inc(Searchs);
-            Ti := GetTickCount - Ti;
+            Ti := GetTickCount64 - Ti;
             if Ti < 0 then
                 Ti := 0;
             Ticks := Ticks + Ti;
@@ -1930,7 +1849,7 @@ begin
                 AddToMemo(s + 'ms ' + '(' + IntToStr(ResultCount)
                 + ') ' + Begriff + '(' + IntToStr(KeyWordCount)
                 + ')' + ' - ' + IntToStr(Ti3 - Ti2) + '/' + IntToStr
-                (GetTickCount - Ti3) + ' (' + IntToStr(Ti5)
+                (GetTickCount64 - Ti3) + ' (' + IntToStr(Ti5)
                 + '/' + IntToStr(Ti6) + ')');
             end;
         end;
@@ -1947,7 +1866,7 @@ end;
 
 
 
-procedure ShowAdminRoot(Req: TIdHTTPRequestInfo; Res: TIdHTTPResponseInfo);
+procedure ShowAdminRoot(Res: TIdHTTPResponseInfo);
 var
   Li: tStringList;
   s: string;
@@ -1975,19 +1894,22 @@ begin
   Str(MaxTicks: 5, s);
   Li.Add(s + 'ms max-query<br/>');
 
-  Str(MinTicks: 5, s);
-  Li.Add(s + 'ms min-query<br/>');
+  // This is not needed as MinTicks is usually 0.
+  //Str(MinTicks: 5, s);
+  //Li.Add(s + 'ms min-query<br/>');
 
   Li.Add('<form action="/admin/shutdown" method="post">');
   Li.Add('<input type="submit" value="Shutdown"></form><br>');
 
-  Res.ContentText := Li.Text;
+  Res.ContentType := 'text/html';
+  Res.CharSet := 'utf-8';
+  Res.ContentStream := tStream(tStringStream.Create(Li.Text));
   Li.Free;
 end;
 
 
 
-procedure tServerObject.IdHTTPServer1CommandGet(AContext: TIdContext;
+procedure tServerObject.CommandGet(AContext: TIdContext;
     ARequestInfo: TIdHTTPRequestInfo;
     AResponseInfo: TIdHTTPResponseInfo);
 begin
@@ -1998,7 +1920,7 @@ begin
         SetupQuery(ARequestInfo, AResponseInfo) else
 
     if AnsiLowerCase(ARequestInfo.Document) = '/admin/' then
-      ShowAdminRoot(ARequestInfo, AResponseInfo) else
+      ShowAdminRoot(AResponseInfo) else
 
     if (AnsiLowerCase(ARequestInfo.Command) = 'post') and
       (AnsiLowerCase(ARequestInfo.Document) = '/admin/shutdown') then
@@ -2016,14 +1938,13 @@ var
 begin
     InitValueArray;
 
-    ServerObject := tServerObject.Create;
 
     IdHTTPServer1:=TIdHTTPServer.Create;
     IdHTTPServer1.Bindings.Clear;
     Binding := IdHTTPServer1.Bindings.Add;
     Binding.IP := '0.0.0.0';
     Binding.Port := 8081;
-    IdHTTPServer1.OnCommandGet := ServerObject.IdHTTPServer1CommandGet;
+    IdHTTPServer1.OnCommandGet := tServerObject.Create.CommandGet;
 
 
     i := 1;
@@ -2061,7 +1982,6 @@ begin
         Inc(i);
     end;
     Randomize;
-    RefreshCachesCountdown := 0;
     WriteLn('SearchServer ', cVersion);
     WriteLn(cCopyright);
 
@@ -2081,5 +2001,6 @@ begin
     SecondPath := cSearchSecondPath;
 
     InitServer;
+    WriteLn('Server ready for requests...');
     while true do Sleep(1000);
 end.
