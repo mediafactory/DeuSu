@@ -46,22 +46,3 @@ for how to do that.
 In both cases you will probably have to adjust some compiler-options
 in the the .bat/.sh file to let FPC know about the path to its libraries.
 Somehow the default FPC install never set the paths correctly for me.
-
-#### About the "code-cleanup" branch:
-
-This branch is an ongoing process to cleanup the codebase.
-
-This software evolved over more than 15 years and you will notice very
-different coding-styles between old and new parts of the code.
-
-I'm trying to cleanup this mess file-by-file to bring everything to
-the same level. This work began in late April 2015 and will probably
-take about 2-3 months. But given how much guesswork time-estimates are
-in software-development, it may take longer...
-
-[As of November 2015 this is still ongoing work]
-
-**There is no guarantee that this branch will work during that time!!**
-**Use the master-branch instead if you want to be sure that it works.**
-
-
