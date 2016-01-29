@@ -37,6 +37,7 @@ compile src/Sleep
 compile src/Parser
 compile src/GenDb
 compile src/cgi/query
+compile src/compressrwi
 
 # The following two only compile with Delphi. Needs fixing.
 #compile Robot
