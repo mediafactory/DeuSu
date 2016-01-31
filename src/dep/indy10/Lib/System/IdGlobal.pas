@@ -3852,7 +3852,11 @@ begin
     // TODO: SysUtils.TEncoding.Default uses ANSI on Windows
     // but uses UTF-8 on POSIX, so we should do the same...
     //LEncoding := {$IFDEF WINDOWS}TIdMBCSEncoding{$ELSE}TIdUTF8Encoding{$ENDIF}.Create;
+    {$IFDEF STRING_IS_ANSI}
+    LEncoding := TIdUTF8Encoding.Create;
+    {$ELSE}
     LEncoding := TIdMBCSEncoding.Create;
+    {$ENDIF}
     if InterlockedCompareExchangeIntf(IInterface(GIdOSDefaultEncoding), LEncoding, nil) <> nil then begin
       LEncoding := nil;
     end;
