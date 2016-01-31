@@ -27,6 +27,10 @@ I feel a LOT better about the quality of my own sourcecode now... :) ]
 **Note 29-Jan-2016: Due to a bug in the Indy library "searchservernew" won't work correctly on Linux
 at the moment! I haven't found a fix or workaround for this yet.**
 
+**Note 31-Jan-2016: I have implemented a (temporary?) fix to Indy that fixes
+the above-mentioned bug. We will have to see if Indy applies that bugfix
+or if they find a different way to fix it.**
+
 As of 12-Jul-2014 the master branch will compile with FreePascal on Linux.
 I have tested it a bit and it at least *seems* to work. That of course does
 *not* mean that it is bug-free. :)
