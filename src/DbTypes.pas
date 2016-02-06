@@ -45,7 +45,7 @@ uses
 const
 
 {$IFDEF FULLSCALE_VERSION}
-  cDbBits = 7; // Number of bits for the shard-number
+  cDbBits = 9; // Number of bits for the shard-number
 {$ELSE}
   cDbBits = 2;
 {$ENDIF}
