@@ -440,6 +440,25 @@ var
     c2: AnsiChar;
 begin
     c := Buffer.GetCurrentCharacter;
+
+    if ord(c) = 195 then
+    begin
+        s := Buffer.PeekAhead(1);
+        Buffer.Advance(1);
+        c2 := s[1];
+        case ord(c2) of
+            164: c := chr(228); // ä
+            182: c := chr(246); // ö
+            188: c := chr(252); // ü
+            132: c := chr(196); // Ä
+            150: c := chr(214); // Ö
+            156: c := chr(220); // Ü
+            159: c := chr(223); // ß
+        end;
+    end
+
+    else
+
     if c = '&' then
     begin
         s := Buffer.PeekAhead(5);
@@ -448,12 +467,12 @@ begin
         if s = 'xuml;' then
         begin
             case c2 of
-                'a': c := 'ä';
-                'o': c := 'ö';
-                'u': c := 'ü';
-                'A': c := 'Ä';
-                'O': c := 'Ö';
-                'U': c := 'Ü';
+                'a': c := chr(228);
+                'o': c := chr(246);
+                'u': c := chr(252);
+                'A': c := chr(196);
+                'O': c := chr(214);
+                'U': c := chr(220);
             end;
             Buffer.Advance(5);
         end
@@ -462,7 +481,7 @@ begin
             s := Buffer.PeekAhead(6);
             if s = 'szlig;' then
             begin
-                c := 'ß';
+                c := chr(223);
                 Buffer.Advance(6);
             end
             else
@@ -497,14 +516,14 @@ begin
     end; // if c='&'
 
     Result := c;
-    case c of
-        'ä': Result := 'ae';
-        'ö': Result := 'oe';
-        'ü': Result := 'ue';
-        'Ä': Result := 'Ae';
-        'Ö': Result := 'Oe';
-        'Ü': Result := 'Ue';
-        'ß': Result := 'ss';
+    case ord(c) of
+        228: Result := 'ae';
+        246: Result := 'oe';
+        252: Result := 'ue';
+        196: Result := 'Ae';
+        214: Result := 'Oe';
+        220: Result := 'Ue';
+        223: Result := 'ss';
     end;
 end;
 
