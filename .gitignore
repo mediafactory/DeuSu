@@ -15,3 +15,4 @@ parser.log
 gendb.progress
 noresults.txt
 robot.log
+testdata/
