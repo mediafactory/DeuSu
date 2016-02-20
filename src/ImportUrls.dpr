@@ -17,6 +17,11 @@ program ImportUrls;
 {$APPTYPE CONSOLE}
 
 
+{$DEFINE NoDupFiltering}
+// In order for the InLinkCount to work properly there must NOT
+// be any filtering of duplicate URLs.
+
+
 uses
     {$ifdef UNIX}
     BaseUnix,
@@ -30,8 +35,7 @@ uses
     GlobalTypes in 'GlobalTypes.pas',
     FileLocation in 'FileLocation.pas',
     Config in 'Config.pas',
-    UrlDatabase in 'UrlDatabase.pas',
-    OSWrapper in 'OSWrapper.pas';
+    UrlDatabase in 'UrlDatabase.pas';
 
 const
     cMaxDupFilter = 4 * 1024 * 1024 - 1;
@@ -267,6 +271,7 @@ var
     fIn: TextFile;
     s: AnsiString;
     i: integer;
+    ProcessedUrlCount: int64;
     CurrentDbNr: integer;
     Sum: int64;
     EnablePreloading: boolean;
@@ -274,6 +279,7 @@ var
     DoPreload: boolean;
     DoRoundRobin: boolean;
     DoClearDb: boolean;
+    DoBiggestFirst: boolean;
     RRFile: TextFile;
     StartDbNr, EndDbNr: integer;
     StartTi, CurrentTi: int64;
@@ -295,6 +301,7 @@ begin
     MaxRuntime := 15 * 60; // The default for MaxRuntime is 15 minutes
     TimeStampInsteadOfBacklinks := false;
     DoClearDb := false;
+    DoBiggestFirst := false;
 
     i := 1;
     while i <= ParamCount do
@@ -305,6 +312,7 @@ begin
         if (s = '-r') or (s = '-roundrobin') then DoRoundRobin := true;
         if (s = '-c') or (s = '-cleardb') then DoClearDb := true;
         if (s = '-p') or (s = '-preload') then DoPreload := true;
+        if (s = '-b') or (s = '-biggestfirst') then DoBiggestFirst := true;
 
         if (s = '-s') or (s = '-startdb') then
         begin
@@ -336,8 +344,8 @@ begin
 
     if EndDbNr < 0 then
     begin
-	if DoRoundRobin then EndDbNr := cDbCount - 1
-	else EndDbNr := 0;
+        if DoRoundRobin then EndDbNr := cDbCount - 1
+        else EndDbNr := 0;
     end;
     if EndDbNr > (cDbCount - 1) then EndDbNr := cDbCount - 1;
 end;
@@ -405,6 +413,125 @@ begin
         ClearDbNr(DbNr);
     end;
 end;
+
+
+
+procedure ProcessSingleUrlsTxt(CurrentDbNr: integer);
+begin
+    if FileExists(cUrls + IntToStr(CurrentDbNr)) then
+    begin
+        AssignFile(fIn, cUrls + IntToStr(CurrentDbNr));
+        Reset(fIn);
+        while not Eof(fIn) do
+        begin
+            ReadLn(fIn, s);
+            if Length(s) <= 255 then
+            begin
+                {$IFNDEF NoDupFiltering}
+                HashCode := CalcCRC(s) and cMaxDupFilter;
+                p := DupFilter[HashCode];
+                while p <> nil do
+                begin
+                    if p.Url = s then break
+                    else p := p.Next;
+                end;
+
+                if p = nil then
+                begin
+                    New(p);
+                    p.Next := DupFilter[HashCode];
+                    p.Url := s;
+                    DupFilter[HashCode] := p;
+                {$ENDIF}
+                    UrlDbNr := CurrentDbNr;
+                    if EnablePreloading then
+                    begin
+                        if UrlDbNr <> LastPreloadDbNr then
+                        begin
+                            if LastPreloadDbNr <> -1 then fOut[LastPreloadDbNr].UnloadCache;
+                            LastPreloadDbNr := UrlDbNr;
+                            fOut[UrlDbNr].Preload;
+                        end;
+                    end;
+
+                    if s <> '' then AddUrl(shortstring(s), prNormal);
+                {$IFNDEF NoDupFiltering}
+                end;
+                {$ENDIF}
+                Inc(ProcessedUrlCount);
+                if (ProcessedUrlCount and 1023) = 0 then
+                    Write(#13, 'URLs: ', ProcessedUrlCount, ' (', LastPreloadDbNr, ')    ');
+            end;
+        end;
+        CloseFile(fIn);
+        DeleteFile(cUrls + IntToStr(CurrentDbNr));
+    end;
+end;
+
+
+procedure ProcessUrlsTxtSequentially;
+begin
+    CurrentDbNr := StartDbNr;
+    repeat
+        ProcessSingleUrlsTxt(CurrentDbNr);
+
+        if CurrentDbNr = EndDbNr then break;
+        CurrentDbNr := (CurrentDbNr + 1) mod cDbCount;
+
+        AssignFile(RRFile, cRoundRobinFile);
+        ReWrite(RRFile);
+        WriteLn(RRFile, CurrentDbNr);
+        CloseFile(RRFile);
+
+        CurrentTi := GetTickCount64;
+        ElapsedSeconds := (CurrentTi - StartTi) div 1000;
+        if ElapsedSeconds > MaxRuntime then break;
+    until false;
+end;
+
+
+
+function FindBiggestUrlsTxt:integer;
+var
+    DbNr: integer;
+    BiggestNr: integer;
+    BiggestSize, ThisSize: int64;
+    Sr: tSearchRec;
+begin
+    BiggestNr := -1;
+    BiggestSize := 0;
+
+    for DbNr := StartDbNr to EndDbNr do
+    begin
+        if FindFirst(cUrls + IntToStr(DbNr), faAnyFile, Sr) = 0 then
+        begin
+            if Sr.Size > BiggestSize then
+            begin
+                BiggestSize := Sr.Size;
+                BiggestNr := DbNr;
+            end;
+        end;
+        FindClose(Sr);
+    end;
+
+    Result := BiggestNr;
+end;
+
+
+
+procedure ProcessBiggestUrlsTxtFirst;
+begin
+    repeat
+        CurrentDbNr := FindBiggestUrlsTxt;
+        if CurrentDbNr <> -1 then ProcessSingleUrlsTxt(CurrentDbNr)
+        else break;
+
+        CurrentTi := GetTickCount64;
+        ElapsedSeconds := (CurrentTi - StartTi) div 1000;
+        if ElapsedSeconds > MaxRuntime then break;
+    until false;
+end;
+
 
 
 begin
@@ -523,77 +650,20 @@ begin
     EnablePreloading := DoPreload;
     LastPreloadDbNr := -1;
 
-{$DEFINE NoDupFiltering}
-    // In order for the InLinkCount to work properly there must NOT
-    // be any filtering of duplicate URLs.
 
-    i := 0;
+
+    ProcessedUrlCount := 0;
     FillChar(DupFilter, SizeOf(DupFilter), 0);
-    StartTi := GetTickCount;
-    CurrentDbNr := StartDbNr;
-    repeat
-        if FileExists(cUrls + IntToStr(CurrentDbNr)) then
-        begin
-            AssignFile(fIn, cUrls + IntToStr(CurrentDbNr));
-            Reset(fIn);
-            while not Eof(fIn) do
-            begin
-                ReadLn(fIn, s);
-                if Length(s) <= 255 then
-                begin
-{$IFNDEF NoDupFiltering}
-                    HashCode := CalcCRC(s) and cMaxDupFilter;
-                    p := DupFilter[HashCode];
-                    while p <> nil do
-                    begin
-                        if p.Url = s then break
-                        else p := p.Next;
-                    end;
+    StartTi := GetTickCount64;
 
-                    if p = nil then
-                    begin
-                        New(p);
-                        p.Next := DupFilter[HashCode];
-                        p.Url := s;
-                        DupFilter[HashCode] := p;
-{$ENDIF}
-// UrlDbNr := DbNrOfUrl(s);
-                        UrlDbNr := CurrentDbNr;
-                        if EnablePreloading then
-                        begin
-                            if UrlDbNr <> LastPreloadDbNr then
-                            begin
-                                if LastPreloadDbNr <> -1 then fOut[LastPreloadDbNr].UnloadCache;
-                                LastPreloadDbNr := UrlDbNr;
-                                fOut[UrlDbNr].Preload;
-                            end;
-                        end;
 
-                        if s <> '' then AddUrl(shortstring(s), prNormal);
-{$IFNDEF NoDupFiltering}
-                    end;
-{$ENDIF}
-                    Inc(i);
-                    if (i and 1023) = 0 then Write(#13, 'URLs: ', i, ' (', LastPreloadDbNr, ')    ');
-                end;
-            end;
-            CloseFile(fIn);
-            DeleteFile(cUrls + IntToStr(CurrentDbNr));
-        end;
+    if DoBiggestFirst then ProcessBiggestUrlsTxtFirst
+    else ProcessUrlsTxtSequentially;
 
-        if CurrentDbNr = EndDbNr then break;
-        CurrentDbNr := (CurrentDbNr + 1) mod cDbCount;
 
-        AssignFile(RRFile, cRoundRobinFile);
-        ReWrite(RRFile);
-        WriteLn(RRFile, CurrentDbNr);
-        CloseFile(RRFile);
+    WriteLn(#13, 'URLs: ', ProcessedUrlCount, ' (', LastPreloadDbNr, ')    ');
 
-        CurrentTi := GetTickCount;
-        ElapsedSeconds := (CurrentTi - StartTi) div 1000;
-        if ElapsedSeconds > MaxRuntime then break;
-    until false;
-    WriteLn(#13, 'URLs: ', i, ' (', LastPreloadDbNr, ')    ');
+
 
     Sum := 0;
     for i := 0 to cDbCount - 1 do
