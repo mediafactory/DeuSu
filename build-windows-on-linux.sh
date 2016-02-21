@@ -21,23 +21,23 @@ compiler=$compiler" -FEbin -FUbin/units"
 
 
 function compile {
-    $compiler $1.dpr
+    $compiler $1
     echo -e '\n'
 }
 
 
-compile src/RobotNew
-compile src/searchservernew
-compile src/ImportUrls
-compile src/ImportAlexa
-compile src/CleanUrlsTxt
-compile src/PrepareRobot
-compile src/ImportData
-compile src/Sleep
-compile src/Parser
-compile src/GenDb
-compile src/cgi/query
-compile src/compressrwi
+compile src/RobotNew.dpr
+compile src/searchservernew.dpr
+compile src/ImportUrls.dpr
+compile src/ImportAlexa.dpr
+compile src/CleanUrlsTxt.dpr
+compile src/PrepareRobot.dpr
+compile src/ImportData.dpr
+compile src/Sleep.dpr
+compile src/Parser.dpr
+compile src/GenDb.dpr
+compile src/cgi/query.dpr
+compile src/compressrwi.dpr
 
 # The following two only compile with Delphi. Needs fixing.
 #compile Robot
