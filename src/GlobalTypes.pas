@@ -25,8 +25,8 @@ const
   cPathDelimiter = '\';
 {$ENDIF}
 
-  cShortVersion = '5.1.4';
-  cDate = '16-Feb-2016';
+  cShortVersion = '5.1.5';
+  cDate = '20-Feb-2016';
   cVersion = cShortVersion+'   '+cDate;
 
   cCopyright = '(c) 1999-2016 Michael Schoebel & Acoon GmbH';
