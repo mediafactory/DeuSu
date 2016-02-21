@@ -83,6 +83,7 @@ var
     CountMaxUrlsPerPart: boolean;
     StartDbNr, EndDbNr: integer;
     MaxPerDb: int64;
+    DeOnly: boolean;
 
 
 function PathDepth(const Url: shortstring): integer;
@@ -138,18 +139,18 @@ begin
         HostName := LowerCase(copy(s, 1, Pos('/', s) - 1)); { Wir wollen nur den Hostnamen komplett in Kleinbuchstaben }
 
         SLD := HostName;
-	(*
-	    This code was used to reduce the hostname to a 2nd-level
-	    domain. I *think* it's better to use the hostname instead.
-	    TODO: This should be completely removed once it is clear
-	    that this change is actually correct.
+        (*
+            This code was used to reduce the hostname to a 2nd-level
+            domain. I *think* it's better to use the hostname instead.
+            TODO: This should be completely removed once it is clear
+            that this change is actually correct.
         repeat
             Dots := 0;
             for i := 1 to Length(SLD) do
                 if SLD[i] = '.' then Inc(Dots);
             if Dots > 1 then Delete(SLD, 1, Pos('.', SLD));
         until Dots <= 2;
-	*)
+        *)
 
         HashCode := CalcCRC(SLD) and cMaxHostHash; { HashCode für den Hostnamen bilden }
         p2 := HostList[HashCode]; { Zum Anfang der Liste für diesen HashCode }
@@ -172,13 +173,13 @@ begin
         end;
 
 
-	(*
-	    There used to be a special-case for certain domains. These
-	    were allowed to be crawled more often than others.
-	    I no longer consider this to be good behaviour.
-	    TODO: The commented-out code below needs to be removed once
-	    it is clear that this change is correct.
-	*)
+        (*
+            There used to be a special-case for certain domains. These
+            were allowed to be crawled more often than others.
+            I no longer consider this to be good behaviour.
+            TODO: The commented-out code below needs to be removed once
+            it is clear that this change is correct.
+        *)
         if (p2^.An >= MaxUrlsPerHost) (* and
         (HostName <> 'www.wikipedia.de') and
         (HostName <> 'de.wikipedia.org') and
@@ -376,6 +377,16 @@ begin
                             Po := i;
                             break;
                         end;
+
+                    if DeOnly then
+                    begin
+                        // Reduce Hostname to TLD
+                        repeat
+                            i := Pos('.', sx);
+                            if i > 0 then Delete(sx, 1, i);
+                        until i = 0;
+                        if (sx <> 'de') and (sx <> 'at') and (sx <> 'ch') then Po := 1;
+                    end;
                 end;
 
                 ThisPriority := Pr;
@@ -405,9 +416,9 @@ begin
                 begin
                     if // (UrlData.InfPo = -1) and
                     (PathDepth(UrlData.Url) <= MaximumPathDepth) then
-		    begin
+                    begin
                         AddEntry(UrlData.Url, UrlPo, UrlData.InLinkCount); { URL speichern }
-		    end;
+                    end;
                 end;
             end;
             Inc(ThisNr);
@@ -651,12 +662,16 @@ begin
     end;
 
     MaxPerDb := -1;
-    if ParamCount = 4 then
+    if (ParamCount >= 4) and (copy(ParamStr(4),1,1)<>'-') then
     begin
         MaxPerDb := StrToIntDef(ParamStr(4), 500 * 1000);
         if MaxPerDb < 1000 then MaxPerDb := 1000;
         if MaxPerDb > (100 * 1000 * 1000) then MaxPerDb := 100 * 1000 * 000;
     end;
+
+    DeOnly := false;
+    for i := 1 to ParamCount do
+        if LowerCase(ParamStr(i)) = '-deonly' then DeOnly := true;
 
     FillChar(Entries, SizeOf(Entries), 0);
     if FileExists(cIgnoreHosts) then
