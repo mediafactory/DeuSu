@@ -42,7 +42,7 @@ type
 
   TBufWriteFile = class
   strict protected
-    FBuf: array [0..16*1024*1024-1] of byte;
+    FBuf: array [0..4*1024*1024-1] of byte;
     FBufLen: int64;
     FFile: TFileStream;
     FFileName: string;
