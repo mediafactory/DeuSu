@@ -1823,7 +1823,7 @@ begin
         Res.ContentType := 'text/html';
         Res.CharSet := 'utf-8';
         {$IFDEF WINDOWS}
-        Res.ContentText := UTF8Decode(Li.Text);
+        Res.ContentText := Li.Text;
         {$ELSE}
         Res.ContentStream := tStream(tStringStream.Create(Li.Text));
         {$ENDIF}
