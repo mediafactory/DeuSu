@@ -481,54 +481,6 @@ begin
 end;
 
 
-procedure HandleClearDb;
-{ Alle URL-Daten zurücksetzen. Die URLs selber bleiben erhalten }
-var
-    f: tCacheFile; { Datei zum Lesen der Daten }
-    f2: tFileStream; { Datei zum Schreiben der Veränderungen }
-    An, Po, LastPo: integer;
-    UrlData: tUrlData; { Datenstruktur für die URL }
-    Changed: integer; { Anzahl der geänderten URLs }
-    DbNr: integer;
-begin
-    for DbNr:=0 to cDbCount-1 do { Alle Datenbanken durchgehen }
-    begin
-        f := tCacheFile.Create; { Datenbank zum Lesen öffnen }
-        f.Assign(cUrlDb + IntToStr(DbNr));
-        f.Reset;
-        f2 := tFileStream.Create(cUrlDb + IntToStr(DbNr), fmOpenReadWrite or fmShareDenyNone);
-        Po := (cMaxUrlHash + 1) * 4 + 4; { Startposition festlegen, Hash-Table und Angabe der URL-Anzahl überspringen }
-        An := 0; { Bisher 0 URLs überprüft }
-        Changed := 0; { Bisher 0 URLs erneut vorgemerkt }
-
-        while not f.Eof do { Die ganze Datei durchlesen }
-        begin
-            f.Seek(Po);
-            LastPo := f.FilePos; { Datei-Position merken, die brauchen wir noch, falls wir Änderungen speichern wollen }
-            f.Read(UrlData, SizeOf(UrlData)); { URL-Daten lesen }
-            Po := f.FilePos;
-
-            if (UrlData.InfPo <> -1) { or (UrlData.Priority=prIgnore) } then { Gibt es zu dieser URL Daten ? }
-            begin
-                UrlData.InfPo := -1; { URL Daten löschen }
-                // f2.Seek(LastPo,soFromBeginning);
-                f2.Position := LastPo;
-                f2.Write(UrlData, SizeOf(UrlData)); { Und geänderten Datensatz schreiben }
-                Inc(Changed); { Zähler für Änderungen um 1 erhöhen }
-            end;
-
-            Inc(An); { Zähler für gecheckte URLs um 1 erhöhen }
-            if (An and 255) = 0 then Write(#13, Changed, '/', An); { regelmäßig Fortschritt anzeigen }
-        end;
-        WriteLn(#13, Changed, '/', An); { Und am Ende nochmal die Gesamtstatistik }
-
-        f.Close; { Die beiden Dateien wieder schließen }
-        f.Free;
-        f2.Free;
-    end;
-end;
-
-
 procedure HandleUnIgnore;
 // Reset all prIgnore URLs to prNormal
 var
@@ -624,12 +576,6 @@ begin
     if LowerCase(ParamStr(1)) = '/exurls' then
     begin
         HandleExUrls;
-        halt;
-    end;
-
-    if LowerCase(ParamStr(1)) = '/cleardb' then
-    begin
-        HandleClearDb;
         halt;
     end;
 
