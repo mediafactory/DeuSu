@@ -1843,7 +1843,7 @@ begin
       s := Copy(AValue, i, j-i);
       // See RFC 1866 section 8.2.1. TP
       s := ReplaceAll(s, '+', ' ');  {do not localize}
-      Params.Add(TIdURI.URLDecode(s, LEncoding));
+      Params.Add(TIdURI.URLDecode(s, nil));
       i := j + 1;
     end;
   finally

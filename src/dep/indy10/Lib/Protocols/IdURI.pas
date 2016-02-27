@@ -382,7 +382,7 @@ begin
     end;
   end;
   {$IFDEF STRING_IS_ANSI}
-  EnsureEncoding(ADestEncoding, encOSDefault);
+  EnsureEncoding(ADestEncoding, encUTF8);
   CheckByteEncoding(LBytes, AByteEncoding, ADestEncoding);
   SetString(Result, PAnsiChar(LBytes), Length(LBytes));
   {$ELSE}
