@@ -52,11 +52,14 @@ const
 type
     tAction = (acSet, acAnd, acNot);
 
+    tResultOccurences = array[1..cMaxKeywords] of int32;
+
     tCachedResult = record
         Pages: array [1 .. 1000] of integer;
         Values: array [1 .. 1000] of uint16;
         MaxValue, Count: integer;
         Query: shortstring;
+        KeywordOccurences: tResultOccurences;
     end;
 
     tServerObject = class
@@ -92,7 +95,7 @@ var
     PreferDe, PreferEn, GerOnly: boolean;
     KeyWordCount: integer;
     KeyWords: array [1 .. cMaxKeywords] of shortstring;
-    KeyWordResultCount: array [1 .. cMaxKeywords] of int32;
+    KeyWordResultCount: tResultOccurences;
     KeyWordAction: array [1 .. cMaxKeywords] of tAction;
     BitField, TempBitField: array of uint32;
     Values: array of uint16;
@@ -1082,6 +1085,7 @@ begin
             MaxValue := CachedResults[HashCode].MaxValue;
             FillChar(ValueTable, SizeOf(ValueTable), 0);
             ThisMax := Count;
+            KeyWordResultCount := CachedResults[HashCode].KeywordOccurences;
             if ThisMax > 1000 then ThisMax := 1000;
             for i := 1 to ThisMax do
             begin
@@ -1362,6 +1366,7 @@ begin
             CachedResults[HashCode].Count := Count;
             CachedResults[HashCode].MaxValue := MaxValue;
             CacheUsed[HashCode] := true;
+            CachedResults[HashCode].KeywordOccurences := KeyWordResultCount;
             Nr := 0;
             for ThisValue := MaxValue downto 0 do
             begin
