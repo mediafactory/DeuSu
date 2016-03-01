@@ -26,6 +26,7 @@ function compile {
 }
 
 
+compile src/deusu-compress-snippets.pas
 compile src/RobotNew.dpr
 compile src/searchservernew.dpr
 compile src/ImportUrls.dpr

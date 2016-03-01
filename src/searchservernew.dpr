@@ -36,6 +36,7 @@ uses
     FileLocation,
     DbTypes,
     rwi,
+    dsSnippets,
     math,
     SyncObjs,
     Words;
@@ -72,6 +73,7 @@ type
 
     tFeatureFlags = record
         EnableCompressedIndex: boolean;
+        EnableCompressedSnippets: boolean;
     end;
 
     tValueArray = array of int32;
@@ -1146,38 +1148,57 @@ end;
 
 
 
+function UTF8ToShortString(const s: UTF8String):shortstring;
+begin
+    if Length(s) > 255 then
+    begin
+        SetLength(Result, 255);
+        Move(s[1], Result[1], 255);
+    end
+    else
+    begin
+        SetLength(Result, Length(s));
+        Move(s[1], Result[1], Length(s));
+    end;
+end;
+
+
 procedure ShowLink(Nr, Value: integer; Li: tStringList);
 var
-    Url: shortstring;
+    Url, Title, Description: shortstring;
     s: shortstring;
     DbNr: integer;
     DocID: integer;
     UrlPo: int64;
     PageInfoSize: integer;
+    Snippet: TSnippet;
+    FileName: UTF8String;
 begin
-    PageInfoSize := 258 + cMaxUrlLength + cMaxTitleLength;
     DocID := Nr;
-
     DbNr := Nr and (cDbCount - 1);
-    UrlPo := Nr shr cDbBits;
-    UrlPo := UrlPo * PageInfoSize;
+    FileName := 'urls.dat' + IntToStr(DbNr);
 
-    Html[DbNr].Position := UrlPo;
+    if FeatureFlags.EnableCompressedSnippets then
+    begin
+        GetCompressedSnippet(
+            cSData + 'compressed.' + FileName,
+            DocID shr cDbBits,
+            Snippet);
+    end
+    else
+    begin
+        GetUncompressedSnippet(cSData + FileName, DocID shr cDbBits, Snippet);
+    end;
 
-    Url := ''; // Stop the compiler complaining about it not being initialized
-    Html[DbNr].Read(Url, 1 + cMaxUrlLength);
-    Li.Add('url=http://' + Url);
+    Li.Add('url=http://' + UTF8ToShortString(Snippet.Url));
 
-    s := ''; // Stop the compiler complaining about it not being initialized
-    Html[DbNr].Read(s, 1 + cMaxTitleLength);
-    if Trim(s) = '' then s := '(Ohne Titel)'; // "Ohne Titel" is German for "Without a title"
-    Li.Add('title=' + s);
+    if Trim(Snippet.Title) = '' then
+        Snippet.Title := '(Ohne Titel)'; // "Ohne Titel" is German for "Without a title"
+    Li.Add('title=' + UTF8ToShortString(Snippet.Title));
 
-    Html[DbNr].Read(s, 256);
-    s := Trim(s);
-    Li.Add('text=' + s);
+    Li.Add('text=' + UTF8ToShortString(Snippet.Description));
+
     Li.Add('rel=' + IntToStr(Value));
-
     Li.Add('domainrank=' + IntToStr(RankData[DocID]));
     Li.Add('backlinks=' + IntToStr(BackLinkData[DocID]));
 end;
@@ -1476,6 +1497,13 @@ begin
                 begin
                     FeatureFlags.EnableCompressedIndex := true;
                     WriteLn('EnableCompressedIndex=true');
+                end;
+
+                if (Key = 'enablecompressedsnippets') and
+                    ((Value = 'true') or (Value = 'yes')) then
+                begin
+                    FeatureFlags.EnableCompressedSnippets := true;
+                    WriteLn('EnableCompressedSnippets=true');
                 end;
             end;
         end;
@@ -1801,7 +1829,8 @@ begin
         ExtractKeywords;
         RefineSearch;
 
-        OpenSnippetDatabases;
+        if not FeatureFlags.EnableCompressedSnippets then
+            OpenSnippetDatabases;
 
         Ti2 := GetTickCount64;
         QueryPass := 1;
@@ -1834,7 +1863,8 @@ begin
         {$ENDIF}
 
         Li.Free;
-        CloseSnippetDatabases;
+        if not FeatureFlags.EnableCompressedSnippets then
+            CloseSnippetDatabases;
 
         if not ThisIsCachedResult then
         begin
