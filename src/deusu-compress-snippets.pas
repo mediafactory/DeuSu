@@ -29,7 +29,7 @@ begin
     while Res = 0 do
     begin
         s := ExtractFilePath(FileName) + Sr.Name;
-        if copy(s, Length(s)-10, 11) <> '.compressed' then
+        if copy(Sr.Name, 1, 11) <> 'compressed.' then
         begin
             Write(s, '...');
             CompressSnippets(s);
