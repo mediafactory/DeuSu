@@ -81,9 +81,21 @@ var
     MaximumPathDepth: integer; // Used to restrict URLs to a maximum path-depth
     MaxUrlsPerHost: integer;
     CountMaxUrlsPerPart: boolean;
-    StartDbNr, EndDbNr: integer;
+    StartShard, EndShard, ShardMask: int32;
     MaxPerDb: int64;
-    DeOnly: boolean;
+    DAChOnly: boolean;
+    DoExportUrls: boolean;
+    DoListShards: boolean;
+
+
+
+function InDbRange(DbNr: int32):boolean;
+begin
+    Result :=
+        ((DbNr and ShardMask) >= StartShard) and
+        ((DbNr and ShardMask) <= EndShard);
+end;
+
 
 
 function PathDepth(const Url: shortstring): integer;
@@ -123,7 +135,7 @@ var
     p2: pHostList;
     s2: shortstring;
     SLD: shortstring;
-    Dots, i: integer;
+    //Dots, i: integer;
 begin
     if s = '' then exit;
 
@@ -276,7 +288,7 @@ var
 begin
     Write(#13, s, Count);
 
-    for DbNr := StartDbNr to EndDbNr do { Alle Datenbanken durchgehen }
+    for DbNr := 0 to cDbCount -1 do if InDbRange(DbNr) then
     begin
         MaxThisCount := 100000000; // 100 million
         if MaxPerDb <> -1 then
@@ -378,14 +390,25 @@ begin
                             break;
                         end;
 
-                    if DeOnly then
+
+
+                    // Reduce Hostname to TLD
+                    repeat
+                        i := Pos('.', sx);
+                        if i > 0 then Delete(sx, 1, i);
+                    until i = 0;
+
+                    if DAChOnly then
                     begin
-                        // Reduce Hostname to TLD
-                        repeat
-                            i := Pos('.', sx);
-                            if i > 0 then Delete(sx, 1, i);
-                        until i = 0;
                         if (sx <> 'de') and (sx <> 'at') and (sx <> 'ch') then Po := 1;
+                    end
+                    else
+                    begin
+                        // Block some *spammy* TLDs
+                        if (sx = 'science') or (sx = 'faith') or (sx = 'date') or
+                            (sx = 'loan') or (sx = 'review') or (sx = 'party') or
+                            (sx = 'win') or (sx = 'club') or (sx = 'webcam') or
+                            (sx = 'cricket') then Po := 1;
                     end;
                 end;
 
@@ -449,7 +472,7 @@ begin
     AssignFile(fOut, cUrls);
     ReWrite(fOut);
 
-    for DbNr := 0 to cDbCount - 1 do { Alle Datenbanken durchgehen }
+    for DbNr := 0 to cDbCount - 1 do if InDbRange(DbNr) then
     begin
         f := tCacheFile.Create; { Datenbank zum Lesen öffnen }
         f.Assign(cUrlDb + IntToStr(DbNr));
@@ -478,6 +501,8 @@ begin
         f.Free;
     end;
     CloseFile(fOut);
+
+    halt;
 end;
 
 
@@ -497,6 +522,125 @@ begin
     end;
 end;
 
+
+
+procedure ShowUsage;
+begin
+    WriteLn;
+    WriteLn('Usage: PrepareRobot [export] {Options}');
+    WriteLn;
+    WriteLn('Options are NOT case-sensitive.');
+    WriteLn;
+    WriteLn('-s --StartDb --StartWith --StartShard <Number>');
+    WriteLn('    Sets the shard-number with which to begin.');
+    WriteLn;
+    WriteLn('-e --EndDb --EndWith --EndShard <Number>');
+    WriteLn('    Sets the shard-number with which to end.');
+    WriteLn;
+    WriteLn('-m --DbMask --ShardMask <Number>');
+    WriteLn('    Sets the shard-mask which is used to determine which shards');
+    WriteLn('    get processed. Shards are processed if:');
+    WriteLn('    (shard-number AND shard-mask) is in range StartShard...EndShard');
+    WriteLn;
+    WriteLn('-l --ListShards');
+    WriteLn('    This will only list the shard-numbers which would be processed');
+    WriteLn('    without actually doing anything. This option is useful if you');
+    WriteLn('    want to test a combination of start/end shard-numbers with a');
+    WriteLn('    shard-mask.');
+    WriteLn;
+    WriteLn('-d --DeOnly --DAChOnly');
+    WriteLn('    If set, then only URLs from .de, .at and .ch domains get');
+    WriteLn('    queued for the robot.');
+    WriteLn;
+    halt;
+end;
+
+
+
+procedure ListShards;
+var
+    i,j: integer;
+begin
+    WriteLn('Shards that would be processed:');
+    j := 0;
+    for i := 0 to cDbCount - 1 do
+        if InDbRange(i) then
+        begin
+            Write(i:4,' ');
+            Inc(j);
+            if (j and 7) = 0 then WriteLn;
+        end;
+
+    if (j and 7) <> 0 then WriteLn;
+    halt;
+end;
+
+
+
+procedure CheckOptions;
+var
+    i: integer;
+    s: UTF8String;
+begin
+    DoExportUrls := false;
+    DoListShards := false;
+    StartShard := 0;
+    EndShard := cDbCount-1;
+    ShardMask := cDbCount -1;
+
+    i := 1;
+    while i <= ParamCount do
+    begin
+        s := LowerCase(ParamStr(i));
+        Inc(i);
+
+        if (s = '-h') or (s = '--help') then
+            ShowUsage // Halts further execution
+
+        else if (s = '-s') or (s = '--startdb') or (s = '--startwith') or (s = '--startshard') then
+        begin
+            StartShard := StrToIntDef(ParamStr(i), 0);
+            Inc(i);
+            if StartShard < 0 then StartShard := 0;
+            if StartShard > (cDbCount - 1) then StartShard := cDbCount - 1;
+        end
+
+        else if (s = '-e') or (s = '--enddb') or (s = '--endwith') or (s = '--endshard') then
+        begin
+            EndShard := StrToIntDef(ParamStr(i), cDbCount - 1);
+            Inc(i);
+            if EndShard < 0 then EndShard := 0;
+            if EndShard > (cDbCount - 1) then EndShard := cDbCount - 1;
+        end
+
+        else if (s = '-m') or (s = '--dbmask') or (s = '--shardmask') then
+        begin
+            ShardMask := StrToIntDef(ParamStr(i), cDbCount - 1);
+            Inc(i);
+            if ShardMask < 1 then ShardMask := 1;
+            if ShardMask > (cDbCount - 1) then ShardMask := cDbCount - 1;
+        end
+
+        else if (s = '-d') or (s = '--deonly') or (s = '--dachonly') then
+            DAChOnly := true
+
+        else if (s = '-l') or (s = '--listshards') then
+            DoListShards := true
+
+        else if s = 'export' then
+            DoExportUrls := true
+
+        else begin
+            WriteLn('Unknown commandline option "', ParamStr(i - 1), '"');
+            WriteLn;
+            ShowUsage; // Halts further execution
+        end;
+
+    end;
+end;
+
+
+
 var
     HashCode: integer; { Temporäre Variable zur HashCode Berechnung }
     fIn: TextFile; { Wird zum Lesen der Ignore-Liste benutzt }
@@ -515,55 +659,26 @@ begin
     CountMaxUrlsPerPart :=
     LowerCase(Config.ReadString('robot.CountMaxUrlsPerPart')) = 'true';
 
-    if ParamCount = 0 then { Keine Parameter angegeben. Kurze Hilfemeldung anzeigen }
-    begin
-        WriteLn('Usage:');
-        WriteLn('PrepareRobot [Number of URLs] {[Maximum path-depth]}');
-        WriteLn('PrepareRobot /exurls');
-        WriteLn('PrepareRobot /cleardb');
-        WriteLn;
-        halt;
-    end;
-
-    if LowerCase(ParamStr(1)) = '/exurls' then
-    begin
-        HandleExUrls;
-        halt;
-    end;
+    CheckOptions;
+    if DoListShards then ListShards; // Halts the program when done
+    if DoExportUrls then HandleExUrls; // Halts the program when done
 
     MaximumPathDepth := 9999; // Allow all URLs by default
-    if ParamCount = 2 then
+    (*if ParamCount = 2 then
     begin
         MaximumPathDepth := StrToIntDef(ParamStr(2), 9999);
         if MaximumPathDepth < 1 then MaximumPathDepth := 1;
         if MaximumPathDepth <> 9999 then
             WriteLn('Maximum path depth set to ', MaximumPathDepth);
-    end;
-
-    StartDbNr := 0;
-    EndDbNr := cDbCount - 1;
-    if ParamCount >= 3 then
-    begin
-        StartDbNr := StrToIntDef(ParamStr(2), 0);
-        if StartDbNr < 0 then StartDbNr := 0;
-        if StartDbNr > (cDbCount - 1) then StartDbNr := cDbCount - 1;
-
-        EndDbNr := StrToIntDef(ParamStr(3), cDbCount - 1);
-        if EndDbNr < 0 then EndDbNr := 0;
-        if EndDbNr > (cDbCount - 1) then EndDbNr := cDbCount - 1;
-    end;
+    end;*)
 
     MaxPerDb := -1;
-    if (ParamCount >= 4) and (copy(ParamStr(4),1,1)<>'-') then
+    (*if (ParamCount >= 4) and (copy(ParamStr(4),1,1)<>'-') then
     begin
         MaxPerDb := StrToIntDef(ParamStr(4), 500 * 1000);
         if MaxPerDb < 1000 then MaxPerDb := 1000;
         if MaxPerDb > (100 * 1000 * 1000) then MaxPerDb := 100 * 1000 * 000;
-    end;
-
-    DeOnly := false;
-    for i := 1 to ParamCount do
-        if LowerCase(ParamStr(i)) = '-deonly' then DeOnly := true;
+    end;*)
 
     FillChar(Entries, SizeOf(Entries), 0);
     if FileExists(cIgnoreHosts) then
@@ -603,7 +718,7 @@ begin
     ReWrite(UrlList);
 
     Count := 0;
-    MaxUrl := StrToIntDef(ParamStr(1), 100000000); { Maximalanzahl der URLs lesen, Default 100 Mio }
+    MaxUrl := 100*1000*1000; { Maximalanzahl der URLs lesen, Default 100 Mio }
     for i := 0 to cMaxHostHash do { Liste mit Hostnamen initialisieren }
         HostList[i] := nil;
 

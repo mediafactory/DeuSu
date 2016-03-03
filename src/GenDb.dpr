@@ -61,7 +61,7 @@ var
     WordOccurences: int64;
     BackLinksFromAge: boolean;
     OutputDir: string;
-    BeginWithShard, EndWithShard: int32;
+    BeginWithShard, EndWithShard, ShardMask: int32;
     // FilterAn: integer;
     // FiAn: array[1..8] of integer;
     // Fi: array[1..8,1..2000] of pstr255;
@@ -277,7 +277,9 @@ begin
         fBackLinks[DbNr].ReWrite;
     end;
 
-    for DbNr := BeginWithShard to EndWithShard do
+    for DbNr := 0 to cDbCount-1 do
+    if ((DbNr and ShardMask) >= BeginWithShard) and
+       ((DbNr and ShardMask) <= EndWithShard) then
     begin
         fUrls := tPreloadedFile.Create;
         fUrls.Assign(cUrlDb + IntToStr(DbNr));
@@ -1206,33 +1208,58 @@ begin
     OutputDir := cSDataPath;
     BeginWithShard := 0;
     EndWithShard := cDbCount-1;
+    ShardMask := cDbCount-1;
 
     i := 1;
     while i <= ParamCount do
     begin
         S := LowerCase(ParamStr(i));
-        if (s='-b') or (S = '-backlinksfromage') then BackLinksFromAge := true;
+        if (s='-b') or
+            (S = '-backlinksfromage') or // For backwards compatibility only
+            (s = '--backlinksfromage') then
+            BackLinksFromAge := true;
 
-        if (S = '-outputdir') or (S = '-o') then
+        if (s = '-o') or
+            (S = '-outputdir') or // For backwards compatibility only
+            (S = '--outputdir') then
         begin
             Inc(i);
             OutputDir := ParamStr(i);
             if OutputDir = '' then OutputDir := cSDataPath;
         end;
 
-        if (S = '-beginshard') then
+        if (s = '-s') or
+            (S = '-beginshard') or // For backwards compatibility only
+            (s = '--startdb') or
+            (s = '--startwith') or
+            (s = '--startshard') then
         begin
             Inc(i);
             BeginWithShard := StrToIntDef(ParamStr(i),0);
             if BeginWithShard < 0 then BeginWithShard := 0;
         end;
 
-        if (S = '-endshard') then
+        if (s = '-e') or
+            (S = '-endshard') or // For backwards compatibility only
+            (s = '--enddb') or
+            (s = '--endwith') or
+            (s = '--endshard') then
         begin
             Inc(i);
             EndWithShard := StrToIntDef(ParamStr(i),0);
             if EndWithShard > (cDbCount - 1) then EndWithShard := cDbCount - 1;
         end;
+
+        if (s = '-m') or
+            (S = '-shardmask') or // For backwards compatibility only
+            (s = '--shardmask') or
+            (s = '--dbmask') then
+        begin
+            Inc(i);
+            ShardMask := StrToIntDef(ParamStr(i),0);
+            if ShardMask > (cDbCount - 1) then ShardMask := cDbCount - 1;
+        end;
+
 
         Inc(i);
     end;

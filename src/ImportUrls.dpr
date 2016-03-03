@@ -272,21 +272,31 @@ var
     s: AnsiString;
     i: integer;
     ProcessedUrlCount: int64;
-    CurrentDbNr: integer;
+    CurrentDbNr: int32;
     Sum: int64;
     EnablePreloading: boolean;
-    LastPreloadDbNr: integer;
+    LastPreloadDbNr: int32;
     DoPreload: boolean;
     DoRoundRobin: boolean;
     DoClearDb: boolean;
     DoBiggestFirst: boolean;
     RRFile: TextFile;
-    StartDbNr, EndDbNr: integer;
+    StartShard, EndShard, ShardMask: int32;
     StartTi, CurrentTi: int64;
     ElapsedSeconds: int64;
     MaxRuntime: int64;
     HashCode: integer;
     p: pDupFilter;
+
+
+
+function InDbRange(DbNr: int32):boolean;
+begin
+    Result :=
+        ((DbNr and ShardMask) >= StartShard) and
+        ((DbNr and ShardMask) <= EndShard);
+end;
+
 
 
 procedure CheckParameters;
@@ -295,8 +305,9 @@ var
     s: string;
 begin
     DoRoundRobin := false;
-    StartDbNr := 0;
-    EndDbNr := cDbCount - 1;
+    StartShard := 0;
+    EndShard := cDbCount - 1;
+    ShardMask := cDbCount - 1;
     DoPreload := false;
     MaxRuntime := 15 * 60; // The default for MaxRuntime is 15 minutes
     TimeStampInsteadOfBacklinks := false;
@@ -308,25 +319,44 @@ begin
     begin
         s := LowerCase(ParamStr(i));
 
-        if (s = '-t') or (s = '-timestampinsteadofbacklinks') then TimeStampInsteadOfBacklinks := true;
-        if (s = '-r') or (s = '-roundrobin') then DoRoundRobin := true;
-        if (s = '-c') or (s = '-cleardb') then DoClearDb := true;
-        if (s = '-p') or (s = '-preload') then DoPreload := true;
-        if (s = '-b') or (s = '-biggestfirst') then DoBiggestFirst := true;
+        if (s = '-t') or (s = '--timestampinsteadofbacklinks') or
+            (s = '-timestampinsteadofbacklinks') // For backwards compatibility only
+            then TimeStampInsteadOfBacklinks := true
 
-        if (s = '-s') or (s = '-startdb') then
+        else if (s = '-r') or (s = '--roundrobin') then DoRoundRobin := true
+
+        else if (s = '-c') or (s = '--cleardb') then DoClearDb := true
+
+        else if (s = '-p') or (s = '--preload')
+            or (s = '-preload') // For backwards compatibility only
+            then DoPreload := true
+
+        else if (s = '-b') or (s = '--biggestfirst') then
+            DoBiggestFirst := true
+
+        else if (s = '-s') or (s = '--startdb') or
+            (s = '--startwith') or (s = '--startshard') then
         begin
             Inc(i);
-            StartDbNr := StrToIntDef(ParamStr(i), 0);
-        end;
+            StartShard := StrToIntDef(ParamStr(i), 0);
+        end
 
-        if (s = '-e') or (s = '-enddb') then
+        else if (s = '-e') or (s = '--enddb') or
+            (s = '--endwith') or (s = '--endshard') then
         begin
             Inc(i);
-            EndDbNr := StrToIntDef(ParamStr(i), cDbCount - 1);
-        end;
+            EndShard := StrToIntDef(ParamStr(i), cDbCount - 1);
+        end
 
-        if (s = '-m') or (s = '-maxruntime') then
+        else if (s = '-m') or (s = '--dbmask') or (s = '--shardmask') then
+        begin
+            Inc(i);
+            ShardMask := StrToIntDef(ParamStr(i), cDbCount - 1);
+            if ShardMask < 1 then ShardMask := 1;
+            if ShardMask > (cDbCount - 1) then ShardMask := cDbCount - 1;
+        end
+
+        else if (s = '-x') or (s = '--maxruntime') then
         begin
             Inc(i);
             MaxRuntime := StrToIntDef(ParamStr(i), 15 * 60);
@@ -337,22 +367,16 @@ begin
         Inc(i);
     end;
 
-    if DoRoundRobin then EndDbNr := StartDbNr - 1;
+    if StartShard < 0 then StartShard := 0;
+    if StartShard > (cDbCount - 1) then StartShard := cDbCount - 1;
 
-    if StartDbNr < 0 then StartDbNr := 0;
-    if StartDbNr > (cDbCount - 1) then StartDbNr := cDbCount - 1;
-
-    if EndDbNr < 0 then
-    begin
-        if DoRoundRobin then EndDbNr := cDbCount - 1
-        else EndDbNr := 0;
-    end;
-    if EndDbNr > (cDbCount - 1) then EndDbNr := cDbCount - 1;
+    if EndShard < 0 then EndShard := 0;
+    if EndShard > (cDbCount - 1) then EndShard := cDbCount - 1;
 end;
 
 
 
-procedure ClearDbNr(DbNr: integer);
+procedure ClearDbNr(DbNr: int32);
 var
     fIn: tPreloadedFile;
     fOut: tBufWriteFile;
@@ -406,17 +430,18 @@ end;
 
 procedure ClearDb;
 var
-    DbNr: integer;
+    DbNr: int32;
 begin
-    for DbNr := StartDbNr to EndDbNr do
-    begin
-        ClearDbNr(DbNr);
-    end;
+    for DbNr := 0 to cDbCount - 1 do
+        if InDbRange(DbNr) then
+        begin
+            ClearDbNr(DbNr);
+        end;
 end;
 
 
 
-procedure ProcessSingleUrlsTxt(CurrentDbNr: integer);
+procedure ProcessSingleUrlsTxt(CurrentDbNr: int32);
 begin
     if FileExists(cUrls + IntToStr(CurrentDbNr)) then
     begin
@@ -469,24 +494,44 @@ begin
 end;
 
 
+
 procedure ProcessUrlsTxtSequentially;
+var
+    i, DbNr: int32;
 begin
-    CurrentDbNr := StartDbNr;
-    repeat
-        ProcessSingleUrlsTxt(CurrentDbNr);
+    DbNr := 0;
+    if DoRoundRobin then
+    begin
+        if FileExists(cRoundRobinFile) then
+        begin
+            AssignFile(RRFile, cRoundRobinFile);
+            Reset(RRFile);
+            ReadLn(RRFile, DbNr);
+            CloseFile(RRFile);
+            if DbNr < 0 then DbNr := 0;
+            if DbNr > (cDbCount - 1) then DbNr := cDbCount - 1;
+        end;
+    end;
 
-        if CurrentDbNr = EndDbNr then break;
-        CurrentDbNr := (CurrentDbNr + 1) mod cDbCount;
+    for i := 1 to cDbCount do
+    begin
+        if InDbRange(DbNr) then
+        begin
+            CurrentDbNr := DbNr;
+            ProcessSingleUrlsTxt(CurrentDbNr);
 
-        AssignFile(RRFile, cRoundRobinFile);
-        ReWrite(RRFile);
-        WriteLn(RRFile, CurrentDbNr);
-        CloseFile(RRFile);
+            AssignFile(RRFile, cRoundRobinFile);
+            ReWrite(RRFile);
+            WriteLn(RRFile, CurrentDbNr);
+            CloseFile(RRFile);
+        end;
 
         CurrentTi := GetTickCount64;
         ElapsedSeconds := (CurrentTi - StartTi) div 1000;
         if ElapsedSeconds > MaxRuntime then break;
-    until false;
+
+        DbNr := (DbNr + 1) mod cDbCount;
+    end;
 end;
 
 
@@ -501,18 +546,19 @@ begin
     BiggestNr := -1;
     BiggestSize := 0;
 
-    for DbNr := StartDbNr to EndDbNr do
-    begin
-        if FindFirst(cUrls + IntToStr(DbNr), faAnyFile, Sr) = 0 then
+    for DbNr := 0 to cDbCount - 1 do
+        if InDbRange(DbNr) then
         begin
-            if Sr.Size > BiggestSize then
+            if FindFirst(cUrls + IntToStr(DbNr), faAnyFile, Sr) = 0 then
             begin
-                BiggestSize := Sr.Size;
-                BiggestNr := DbNr;
+                if Sr.Size > BiggestSize then
+                begin
+                    BiggestSize := Sr.Size;
+                    BiggestNr := DbNr;
+                end;
             end;
+            FindClose(Sr);
         end;
-        FindClose(Sr);
-    end;
 
     Result := BiggestNr;
 end;
@@ -547,21 +593,6 @@ begin
         halt;
     end;
 
-    if DoRoundRobin then
-    begin
-        if FileExists(cRoundRobinFile) then
-        begin
-            AssignFile(RRFile, cRoundRobinFile);
-            Reset(RRFile);
-            ReadLn(RRFile, StartDbNr);
-            CloseFile(RRFile);
-            if StartDbNr < 0 then StartDbNr := 0;
-            if StartDbNr > (cDbCount - 1) then StartDbNr := cDbCount - 1;
-            EndDbNr := StartDbNr - 1;
-            if EndDbNr < 0 then EndDbNr := cDbCount -1;
-        end;
-    end
-    else DeleteFile(cRoundRobinFile);
 
 
     Hosts := tStringList.Create;
