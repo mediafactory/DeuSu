@@ -80,6 +80,7 @@ var
     NewPathIg: pPathIg; { Anzahl der gesperrten Pfade }
     MaximumPathDepth: integer; // Used to restrict URLs to a maximum path-depth
     MaxUrlsPerHost: integer;
+    DACH_MaxUrlsPerHost: integer;
     CountMaxUrlsPerPart: boolean;
     StartShard, EndShard, ShardMask: int32;
     MaxPerDb: int64;
@@ -126,7 +127,7 @@ begin
 end;
 
 
-procedure AddEntry(const s: shortstring; UrlPo, InLinkCount: int64);
+procedure AddEntry(const s: shortstring; UrlPo, InLinkCount: int64; IsDACH: boolean);
 { Eine URL in die interne URL-Liste aufnehmen, falls die Maximalzahl von URLs für diesen Host noch nicht erreicht sind. }
 var
     p: pEntry;
@@ -185,21 +186,9 @@ begin
         end;
 
 
-        (*
-            There used to be a special-case for certain domains. These
-            were allowed to be crawled more often than others.
-            I no longer consider this to be good behaviour.
-            TODO: The commented-out code below needs to be removed once
-            it is clear that this change is correct.
-        *)
-        if (p2^.An >= MaxUrlsPerHost) (* and
-        (HostName <> 'www.wikipedia.de') and
-        (HostName <> 'de.wikipedia.org') and
-        (HostName <> 'www.wikipedia.org') and
-        (HostName <> 'en.wikipedia.org') and
-        (HostName <> 'www.reddit.com') and
-        (HostName <> 'feedproxy.google.com') *)
-        then exit; { Maximum überschritten, also sind wir hier fertig. Diese URL also *nicht* mit aufnehmen }
+        // Don't add if there are already too many URLs from this host
+        if (not IsDACH) and (p2^.An >= MaxUrlsPerHost) then exit;
+        if IsDACH and (p2^.An >= DACH_MaxUrlsPerHost) then exit;
 
 
 
@@ -285,6 +274,7 @@ var
     sx, Ul: shortstring;
     MaxThisCount: integer;
     TmpFile: tPreloadedFile;
+    IsDACH: boolean;
 begin
     Write(#13, s, Count);
 
@@ -362,10 +352,10 @@ begin
             begin
                 Po := -1; { Ab hier kommt eine Menge Code, um bestimmte URL-Endungen zu ignorieren }
                         { Dies sind alles Binär-Dateien, die man gar nicht erst zu überprüfen braucht }
+                IsDACH := false;
 
 
                 if UrlHasBlockedExtension(Ul) then Po := 0;
-
 
                 if Po = -1 then
                 begin { Und hier kommt der Anti-Spam Filter gegen die ganzen Sex-Site Anbieter }
@@ -397,10 +387,11 @@ begin
                         i := Pos('.', sx);
                         if i > 0 then Delete(sx, 1, i);
                     until i = 0;
+                    IsDACH := (sx = 'de') or (sx = 'at') or (sx = 'ch');
 
                     if DAChOnly then
                     begin
-                        if (sx <> 'de') and (sx <> 'at') and (sx <> 'ch') then Po := 1;
+                        if not IsDACH then Po := 1;
                     end
                     else
                     begin
@@ -440,7 +431,7 @@ begin
                     if // (UrlData.InfPo = -1) and
                     (PathDepth(UrlData.Url) <= MaximumPathDepth) then
                     begin
-                        AddEntry(UrlData.Url, UrlPo, UrlData.InLinkCount); { URL speichern }
+                        AddEntry(UrlData.Url, UrlPo, UrlData.InLinkCount, IsDACH);
                     end;
                 end;
             end;
@@ -552,6 +543,19 @@ begin
     WriteLn('    If set, then only URLs from .de, .at and .ch domains get');
     WriteLn('    queued for the robot.');
     WriteLn;
+    WriteLn('-f --DACHFactor <Factor>');
+    WriteLn('    In deusu.config[.default] there is a setting "robot.MaxUrlsPerHost"');
+    WriteLn('    which defines how many URLs of a single host are allowed to be crawled.');
+    WriteLn;
+    WriteLn('    With this parameter you can set a different value for hosts from');
+    WriteLn('    .de, .at and .ch domains. The value for this parameter is used as a');
+    WriteLn('    multiplier to the setting in deusu.config. So if for example in');
+    WriteLn('    deusu.config robot.MaxUrlsPerHost is set to 4 and with this parameter');
+    WriteLn('    you set a factor of 5, then for DACH-domains the limit will be');
+    WriteLn('    20 URLs per host.');
+    WriteLn;
+    WriteLn('    Note that this setting is independent of the --DACHOnly option.');
+    WriteLn;
     halt;
 end;
 
@@ -627,6 +631,14 @@ begin
         else if (s = '-l') or (s = '--listshards') then
             DoListShards := true
 
+        else if (s = '-f') or (s = '--dachfactor') then
+        begin
+            DACH_MaxUrlsPerHost := MaxUrlsPerHost * StrToIntDef(ParamStr(i), 1);
+            Inc(i);
+            if DACH_MaxUrlsPerHost < 1 then DACH_MaxUrlsPerHost := 1;
+            if DACH_MaxUrlsPerHost > 10000 then DACH_MaxUrlsPerHost := 10000;
+        end
+
         else if s = 'export' then
             DoExportUrls := true
 
@@ -655,6 +667,7 @@ begin
     MaxUrlsPerHost := Config.ReadIntegerDefault('robot.MaxUrlsPerHost', 5);
     if MaxUrlsPerHost < 1 then MaxUrlsPerHost := 1;
     if MaxUrlsPerHost > 10000 then MaxUrlsPerHost := 10000;
+    DACH_MaxUrlsPerHost := MaxUrlsPerHost;
 
     CountMaxUrlsPerPart :=
     LowerCase(Config.ReadString('robot.CountMaxUrlsPerPart')) = 'true';
