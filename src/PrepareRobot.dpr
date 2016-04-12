@@ -387,7 +387,9 @@ begin
                         i := Pos('.', sx);
                         if i > 0 then Delete(sx, 1, i);
                     until i = 0;
-                    IsDACH := (sx = 'de') or (sx = 'at') or (sx = 'ch');
+                    IsDACH := (sx = 'de') or (sx = 'at') or (sx = 'ch') or
+                              (sx = 'nl') or (sx = 'dk');
+                    // .nl and .dk added by popular demand (1 person) :)
 
                     if DAChOnly then
                     begin
