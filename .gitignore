@@ -6,6 +6,7 @@ bin/
 *.o
 *.ppu
 *.rst
+*.rsj
 data/
 .directory
 ImportUrls.rr

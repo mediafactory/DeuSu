@@ -21,6 +21,9 @@ del *.o
 del *.ppu
 del *.exe
 
+%Compiler% deusu-compress-snippets.pas
+if errorlevel 1 goto Error
+
 %Compiler% RobotNew.dpr
 if errorlevel 1 goto Error
 
@@ -52,6 +55,9 @@ if errorlevel 1 goto Error
 if errorlevel 1 goto Error
 
 %Compiler% cgi\query.dpr
+if errorlevel 1 goto Error
+
+%Compiler% compressrwi.dpr
 if errorlevel 1 goto Error
 
 move /Y *.exe ..\bin
