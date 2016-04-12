@@ -29,6 +29,7 @@ uses
     SysUtils,
     Classes,
     StrUtils,
+    {$ifdef DCC} OSWrapper, {$endif}
     Hash in 'Hash.pas',
     DbTypes in 'DbTypes.pas',
     CacheFile in 'CacheFile.pas',

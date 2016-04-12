@@ -54,6 +54,13 @@ if errorlevel 1 goto Error
 %Compiler% cgi\query.dpr
 if errorlevel 1 goto Error
 
+rem %Compiler% deusu-compress-snippets.pas
+rem if errorlevel 1 goto Error
+rem Requires paszlib which is part of FreePascal
+
+%Compiler% compressrwi.dpr
+if errorlevel 1 goto Error
+
 move /Y *.exe ..\bin
 del *.dcu
 move /Y cgi\*.exe ..\bin

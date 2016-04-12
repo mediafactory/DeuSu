@@ -25,6 +25,7 @@ type
 {$EndIf}
 
 function GetTickCount:int64;
+{$ifdef DCC} function GetTickCount64:int64; {$endif}
 
 implementation
 
@@ -44,6 +45,14 @@ begin
     Result:=Windows.GetTickCount;
     {$Endif}
 end;
+
+
+{$ifdef DCC}
+function GetTickCount64:int64;
+begin
+    Result := GetTickCount;
+end;
+{$endif}
 
 
 
