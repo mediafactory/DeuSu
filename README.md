@@ -2,7 +2,8 @@
 
 This is a web search-engine that can easily hold 2 billion web-pages
 in its search-index. If you want to see what it can do, see
-https://deusu.org/
+https://deusu.org/ (or https://deusu.de if you want a German UI).
+
 
 The above website runs on an Intel i7-3770K with 32gb RAM and two 500gb SSDs
 running Windows Server, and another similar computer with just one 500gb SSD
