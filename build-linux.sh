@@ -16,7 +16,9 @@ compiler=$compiler" -Fusrc/dep/indy10/Lib/*"
 # line to match your setup!
 #
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-compiler=$compiler" -Fu/usr/local/lib/fpc/3.0.0/units/x86_64-linux/*"
+# why? wenn /etc/fpc.dfg says:
+# -Fu/usr/lib/fpc/$fpcversion/units/$fpctarget -Fu/usr/lib/fpc/$fpcversion/units/$fpctarget/* -Fu/usr/lib/fpc/$fpcversion/units/$fpctarget/rtl
+#compiler=$compiler" -Fu/usr/local/lib/fpc/3.0.0/units/x86_64-linux/*"
 compiler=$compiler" -FEbin -FUbin/units"
 
 
