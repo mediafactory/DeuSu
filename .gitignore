@@ -17,3 +17,4 @@ gendb.progress
 noresults.txt
 robot.log
 testdata/
+vagrant/linux/.vagrant
