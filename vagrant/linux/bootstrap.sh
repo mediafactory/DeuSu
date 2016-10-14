@@ -21,6 +21,7 @@ ln -s /vagrant_project/ /home/vagrant/DeuSu 2>/dev/null
 
 cd /home/vagrant/DeuSu
 ./build-linux.sh
+./makedirs.sh
 
 # create an empty URL-database
 cd bin
