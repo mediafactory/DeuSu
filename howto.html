@@ -12,7 +12,7 @@ It runs right from within the directory where you unpack it.</p>
 <p>Open a command-prompt and change to the directory where you unpacked the files. Run "makedirs.bat". This will create
 several subdirectories within your install directory that will hold all the data-files.</p>
 
-<p>Now run the program "ImportUrls". At this point this will only create an empty URL-database.</p>
+<p>Now run the program "bin\ImportUrls". At this point this will only create an empty URL-database.</p>
 
 <p>You will now need some starting-points for the crawler. In the command-prompt enter the following command:</p>
 
@@ -37,7 +37,7 @@ and recompiling, but you will probably never need to do this. 128 should work ju
 <p>The starting and ending numbers are there so that you can give the crawler smaller, clearly defined pieces to work
 with. For the first test you can ignore this. So enter this command:</p>
 
-<p><strong>PrepareRobot 10000000</strong></p>
+<p><strong>bin\PrepareRobot 10000000</strong></p>
 
 <p>(that's 10 million, plenty enough for now)</p>
 
@@ -47,7 +47,7 @@ database, this could easily take about an hour though.</p>
 <p>Ok, before the next step you will need to open a second command-prompt. This one will be used to run the parser-loop.
 Change to your install-directory and start "parse.bat". This will run parser.exe again and again in an endless loop.</p>
 
-<p>In your first command-prompt start "robot.exe". Depending on the number of URLs to crawl the startup of robot.exe
+<p>In your first command-prompt start "bin\robot.exe". Depending on the number of URLs to crawl the startup of robot.exe
 can take up to a minute or two. With only 1 million URLs it should only take a few seconds.</p>
 
 <p>The window of robot.exe will show you some information about how fast it is crawling and – very importantly – it will
@@ -71,14 +71,14 @@ And yet wait another bit for deusu.sh/.bat to finish processing the data. Quit d
 it counting down from 5 to 0. Remember to NEVER abort deusu.sh/.bat at some other point.</p>
 
 <p>You can now begin another PrepareRobot / Robot / deusu.sh/.bat loop, or you can generate your first search-index. Here's
-how to build an index: Simply start Gendb.exe from the command-prompt. With a very small amount of WWW-pages this will
+how to build an index: Simply start bin\Gendb.exe from the command-prompt. With a very small amount of WWW-pages this will
 only take about a minute or two. With larger amounts of data you should expect it to be on the order of one hour per 40 million pages.</p>
 
 <p>Note that GenDb.exe will create some temp files that it will NOT clear up when done. It keeps these more or less for
 debugging-purposes. Before you can make another GenDb-run you will need to delete gendb.progress and everything in the
 data\tmp directory.</p>
 
-<p>Once the index is generated, start SearchServer.exe. The first time you do this you will probably see an alert from your
+<p>Once the index is generated, start bin\searchservernew. The first time you do this you will probably see an alert from your
 firewall as the SearchServer will need to listen on port 8081. Set your firewall to allow this.</p>
 
 <p>Open your web-browser and enter the following URL:</p>
