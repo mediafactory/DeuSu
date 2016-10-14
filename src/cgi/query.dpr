@@ -8,6 +8,9 @@
 program query;
 
 uses
+    {$ifdef Unix}
+    cthreads,
+    {$endif}
     SysUtils,
     Classes,
     CgiTools,
