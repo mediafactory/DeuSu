@@ -24,7 +24,6 @@ cd /home/vagrant/DeuSu
 ./makedirs.sh
 
 # create an empty URL-database
-cd bin
-./ImportUrls
+./bin/ImportUrls
 
-cp ../domainrank.txt data/txt/urls.txt
+#cp domainrank.txt data/txt/urls.txt
